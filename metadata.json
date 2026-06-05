@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Codelmaq ",
+  "description": "A comprehensive fleet and maintenance management system for heavy machinery and trucks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

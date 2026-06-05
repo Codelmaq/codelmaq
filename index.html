@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Remix: Codelmaq Frota</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Tailwind Configuration -->
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                DEFAULT: '#EAB308',
+                light: '#FEF08A',
+                dark: '#A16207',
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              heading: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    
+    <!-- Inline Theme detection script to avoid flashing -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'light') {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+        } else if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+          document.documentElement.classList.remove('light');
+        } else {
+          const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (systemPrefersDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.classList.remove('light');
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
+          }
+        }
+      })();
+    </script>
+
+    <style>
+      /* Custom Premium Scrollbar for Dark/Light Mode */
+      html.dark ::-webkit-scrollbar { width: 6px; }
+      html.dark ::-webkit-scrollbar-track { background: #101010; }
+      html.dark ::-webkit-scrollbar-thumb { background: rgba(234, 179, 8, 0.4); border-radius: 3px; }
+
+      html.light ::-webkit-scrollbar, ::-webkit-scrollbar { width: 6px; }
+      html.light ::-webkit-scrollbar-track, ::-webkit-scrollbar-track { background: #f9fafb; }
+      html.light ::-webkit-scrollbar-thumb, ::-webkit-scrollbar-thumb { background: rgba(234, 179, 8, 0.4); border-radius: 3px; }
+
+      /* Set fonts globally */
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      h1, h2, h3, h4, h5, h6, .font-heading {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      button, .btn-font {
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body class="bg-white dark:bg-[#101010] text-[#101010] dark:text-[#f0f0f0] transition-colors duration-200">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
