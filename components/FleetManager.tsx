@@ -16,6 +16,7 @@ import { DashboardView, MachinesView, AdminView } from './FleetViews1';
 import { MaintenanceView, DailyLogView, MaintenancePlanView } from './FleetViews2';
 import { WorkshopView, ManagementView, ReportsView, FuelTruckView, PerformanceView } from './FleetViews3';
 import { MaintenancePlansView } from './MaintenancePlansView';
+import { ProfileView } from './ProfileView';
 import MobileApkHub from './MobileApkHub';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { 
@@ -1398,11 +1399,18 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
 
         <div className="p-4 border-t border-gray-800">
           <div className="flex items-center justify-between px-4 py-2">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center text-yellow-950 font-bold text-sm">
+            <button
+              onClick={() => {
+                setCurrentView('profile');
+                router.push('/perfil');
+              }}
+              className="flex items-center space-x-3 min-w-0 flex-1 text-left cursor-pointer rounded-xl px-2 py-1 -ml-2 hover:bg-gray-800/50 transition-colors"
+              title="Ver perfil"
+            >
+              <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center text-yellow-950 font-bold text-sm flex-shrink-0">
                 {userProfile?.nome ? userProfile.nome.charAt(0).toUpperCase() : (isAdmin ? 'AD' : 'OP')}
               </div>
-              <div className="text-left">
+              <div className="text-left min-w-0 flex-1">
                 <p className="text-sm font-medium text-white truncate max-w-[100px]">
                   {userProfile?.nome || (isAdmin ? 'Administrador' : 'Operador')}
                 </p>
@@ -1410,7 +1418,8 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
                   {isAdmin ? 'Administrador' : (userProfile?.role || 'Colaborador')}
                 </p>
               </div>
-            </div>
+              <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />
+            </button>
             <button
               onClick={() => {
                 setUsuario(null);
@@ -1446,7 +1455,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }}
-              className="md:hidden fixed top-0 right-0 bottom-0 w-[280px] max-w-[85vw] bg-white dark:bg-[#101010] border-l border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 z-50 flex flex-col shadow-2xl"
+              className="md:hidden fixed top-0 right-0 bottom-0 w-[80vw] bg-white dark:bg-[#101010] border-l border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 z-50 flex flex-col shadow-2xl"
               role="dialog"
               aria-modal="true"
               aria-label="Menu de navegação"
@@ -1491,16 +1500,24 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
               </div>
 
               <div className="px-4 py-2">
-                <SyncIndicator />
+                <SyncIndicator compact />
               </div>
 
               <div className="p-4 border-t border-gray-200 dark:border-white/5 space-y-3">
-                <div className="flex items-center justify-between px-4 py-2">
-                  <div className="flex items-center space-x-3 min-w-0">
+                <div className="flex items-center justify-between gap-2 px-4 py-2">
+                  <button
+                    onClick={() => {
+                      setCurrentView('profile');
+                      router.push('/perfil');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex items-center space-x-3 min-w-0 flex-1 text-left cursor-pointer rounded-xl px-2 py-1 -ml-2 hover:bg-gray-100 dark:hover:bg-[#1e1e1e] transition-colors"
+                    title="Ver perfil"
+                  >
                     <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center text-yellow-950 font-bold text-sm flex-shrink-0">
                       {userProfile?.nome ? userProfile.nome.charAt(0).toUpperCase() : (isAdmin ? 'AD' : 'OP')}
                     </div>
-                    <div className="text-left min-w-0">
+                    <div className="text-left min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
                         {userProfile?.nome || (isAdmin ? 'Administrador' : 'Operador')}
                       </p>
@@ -1508,7 +1525,8 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
                         {isAdmin ? 'Administrador' : (userProfile?.role || 'Colaborador')}
                       </p>
                     </div>
-                  </div>
+                    <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
+                  </button>
                   <button
                     onClick={() => {
                       setUsuario(null);
@@ -1639,6 +1657,9 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
           )}
           {currentView === 'mobile-hub' && (
             <MobileApkHub />
+          )}
+          {currentView === 'profile' && (
+            <ProfileView userProfile={userProfile} />
           )}
         </div>
       </main>

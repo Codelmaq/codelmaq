@@ -26,6 +26,7 @@ export default function App() {
         <Route path="/ordens-servico" element={<FleetManager initialView="maintenance" />} />
         <Route path="/relatorios" element={<FleetManager initialView="reports" />} />
         <Route path="/configuracoes" element={<FleetManager initialView="admin" />} />
+        <Route path="/perfil" element={<FleetManager initialView="profile" />} />
 
         {/* Other pages */}
         <Route path="/login" element={<LoginPage />} />

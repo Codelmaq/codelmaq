@@ -14,14 +14,17 @@ import {
   CheckCircle, 
   DatabaseBackup,
   Sparkles,
-  Info
+  Info,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
-export function SyncIndicator() {
+export function SyncIndicator({ compact = false }: { compact?: boolean }) {
   const { isOnline, hasInternet, loading: isProbing, triggerForceProbe } = useNetworkStatus();
   const [syncStatus, setSyncStatus] = useState<SyncStatusReport>(syncEngine.getStatus());
   const [isSyncingLocal, setIsSyncingLocal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Subscribe to syncEngine reports
   useEffect(() => {
@@ -85,6 +88,35 @@ export function SyncIndicator() {
   return (
     <div className="p-4 bg-white dark:bg-[#151515]/90 border border-gray-200 dark:border-white/10 rounded-2xl space-y-3 shadow-md backdrop-blur-md transition-all duration-300 hover:border-yellow-500/30">
       
+      {/* Compact header (only when compact=true): just the sync button + expand toggle */}
+      {compact && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleManualSync}
+            disabled={isSyncingLocal || (!hasInternet && !isOnline)}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+              hasPending && hasInternet
+                ? 'bg-[#eab308] hover:bg-[#ca8a04] text-black shadow-[0_0_15px_rgba(161,122,240,0.3)]'
+                : 'bg-gray-100 dark:bg-[#151515] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/5 hover:bg-gray-200 dark:hover:bg-[#1a1a1a]'
+            }`}
+          >
+            <RefreshCw size={13} className={`mr-1 ${isSyncingLocal ? 'animate-spin' : ''}`} />
+            <span>{isSyncingLocal ? 'Transmitindo...' : 'Sincronizar Agora'}</span>
+          </button>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-2.5 rounded-xl bg-gray-100 dark:bg-[#151515] border border-gray-200 dark:border-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#1a1a1a] transition-colors cursor-pointer flex items-center justify-center"
+            aria-label={isExpanded ? 'Ocultar detalhes de sincronização' : 'Expandir detalhes de sincronização'}
+            title={isExpanded ? 'Ocultar detalhes' : 'Expandir detalhes'}
+          >
+            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+        </div>
+      )}
+
+      {/* Full body: shown always when not compact, or when compact and expanded */}
+      {(!compact || isExpanded) && (
+        <>
       {/* Network Connectivity status visual badge */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2 text-xs">
@@ -133,28 +165,30 @@ export function SyncIndicator() {
         </div>
       </div>
 
-      {/* Primary Sync Actions */}
-      <div className="space-y-2">
-        <button
-          onClick={handleManualSync}
-          disabled={isSyncingLocal || (!hasInternet && !isOnline)}
-          className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center space-x-2 transition-all cursor-pointer ${
-            hasPending && hasInternet
-              ? 'bg-[#eab308] hover:bg-[#ca8a04] text-black shadow-[0_0_15px_rgba(161,122,240,0.3)]'
-              : 'bg-gray-100 dark:bg-[#151515] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/5 hover:bg-gray-200 dark:hover:bg-[#1a1a1a]'
-          }`}
-        >
-          <RefreshCw size={13} className={`mr-1 ${isSyncingLocal ? 'animate-spin' : ''}`} />
-          <span>{isSyncingLocal ? 'Transmitindo...' : 'Sincronizar Agora'}</span>
-        </button>
+      {/* Primary Sync Actions (only when NOT compact) */}
+      {!compact && (
+        <div className="space-y-2">
+          <button
+            onClick={handleManualSync}
+            disabled={isSyncingLocal || (!hasInternet && !isOnline)}
+            className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+              hasPending && hasInternet
+                ? 'bg-[#eab308] hover:bg-[#ca8a04] text-black shadow-[0_0_15px_rgba(161,122,240,0.3)]'
+                : 'bg-gray-100 dark:bg-[#151515] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/5 hover:bg-gray-200 dark:hover:bg-[#1a1a1a]'
+            }`}
+          >
+            <RefreshCw size={13} className={`mr-1 ${isSyncingLocal ? 'animate-spin' : ''}`} />
+            <span>{isSyncingLocal ? 'Transmitindo...' : 'Sincronizar Agora'}</span>
+          </button>
 
-        {/* Dynamic Sync state detailed info logs */}
-        {syncStatus.lastSyncTime && (
-          <p className="text-[9px] text-gray-500 dark:text-gray-400 text-center">
-            Último sincronismo: <span className="text-gray-700 dark:text-gray-300 font-semibold">{syncStatus.lastSyncTime}</span>
-          </p>
-        )}
-      </div>
+          {/* Dynamic Sync state detailed info logs */}
+          {syncStatus.lastSyncTime && (
+            <p className="text-[9px] text-gray-500 dark:text-gray-400 text-center">
+              Último sincronismo: <span className="text-gray-700 dark:text-gray-300 font-semibold">{syncStatus.lastSyncTime}</span>
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Sync Error Board fallback alerts if offline transfers failed */}
       {syncStatus.errors.length > 0 && (
@@ -230,7 +264,7 @@ export function SyncIndicator() {
               }
               
               await syncEngine.countPendingRecords();
-              alert("Limpeza concluída. Os registros problemáticos e referências inválidas foram removidos.");
+              alert("Limpeza concluída. Os registros problemáticos e referências inválidas foram removidas.");
             }
           }}
           className="w-full text-[9px] text-red-500 hover:text-red-700 underline text-center cursor-pointer"
@@ -249,6 +283,16 @@ export function SyncIndicator() {
           </ul>
           <p className="text-[8px] text-gray-500 dark:text-gray-400">Transação de Sincronia usa rollback atômico e remapeamento de Fk de negócios.</p>
         </div>
+      )}
+
+        </>
+      )}
+
+      {/* Last sync timestamp (shown in compact mode when expanded, hidden when collapsed) */}
+      {compact && isExpanded && syncStatus.lastSyncTime && (
+        <p className="text-[9px] text-gray-500 dark:text-gray-400 text-center">
+          Último sincronismo: <span className="text-gray-700 dark:text-gray-300 font-semibold">{syncStatus.lastSyncTime}</span>
+        </p>
       )}
 
     </div>
