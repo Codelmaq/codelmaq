@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   LayoutDashboard, Truck, Wrench, ShieldCheck, X,
-  ClipboardList, Cog, Gauge, BarChart3, Briefcase, MoreVertical,
+  ClipboardList, Cog, Gauge, BarChart3, Briefcase, Menu,
   FileText, Fuel, Droplets, Trophy, AlertTriangle,
   Users, ChevronRight, ChevronLeft, Smartphone, LogOut, Sparkles
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   initialMachines, initialMaintenances, initialMaintenancePlans, 
   initialDailyLogs, initialEmployees, initialSites, initialManagementReports,
@@ -33,6 +34,7 @@ import { useRouter } from '@/hooks/useRouter';
 import { useAuthStore } from '@/store/authStore';
 import { SyncIndicator } from './SyncIndicator';
 import { OfflineFormPanel } from './OfflineFormPanel';
+import { ThemeToggle } from './ThemeToggle';
 import { genId } from '@/lib/utils';
 
 export default function FleetManager({ initialView = 'dashboard' }: { initialView?: string }) {
@@ -1348,13 +1350,17 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
         <div className="flex items-center">
           <div className="font-bold text-xl tracking-wider text-yellow-500">CODELMAQ</div>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-800 dark:text-gray-100 dark:text-gray-300 hover:text-yellow-500">
-          <MoreVertical size={24} />
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 text-gray-800 dark:text-gray-100 hover:text-yellow-500 transition-colors"
+          aria-label="Abrir menu de navegação"
+        >
+          <Menu size={24} />
         </button>
       </div>
 
-      <nav className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:block w-full md:w-64 bg-white dark:bg-[#101010] border-r border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 flex-shrink-0 flex flex-col ${hasTopBanner ? 'md:mt-12' : ''}`}>
-        <div className="hidden md:flex justify-center p-6 mb-4">
+      <nav className={`hidden md:flex w-full md:w-64 bg-white dark:bg-[#101010] border-r border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 flex-shrink-0 flex-col ${hasTopBanner ? 'md:mt-12' : ''}`}>
+        <div className="flex justify-center p-6 mb-4">
           <div className="font-bold text-3xl tracking-wider text-yellow-500">CODELMAQ</div>
         </div>
 
@@ -1419,6 +1425,112 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
           </div>
         </div>
       </nav>
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div
+              key="mobile-menu-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+              aria-hidden="true"
+            />
+            <motion.aside
+              key="mobile-menu-panel"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', ease: 'easeOut', duration: 0.3 }}
+              className="md:hidden fixed top-0 right-0 bottom-0 w-[280px] max-w-[85vw] bg-white dark:bg-[#101010] border-l border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 z-50 flex flex-col shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu de navegação"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-white/5">
+                <div className="font-bold text-2xl tracking-wider text-yellow-500">CODELMAQ</div>
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2 text-gray-700 dark:text-gray-300 hover:text-yellow-500 transition-colors"
+                  aria-label="Fechar menu"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+                {menuItems.map(item => {
+                  const Icon = item.icon;
+                  const isActive = currentView === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        if (item.path) {
+                          router.push(item.path);
+                        } else {
+                          setCurrentView(item.id);
+                        }
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
+                        isActive 
+                          ? 'bg-yellow-500 text-yellow-950 font-semibold shadow-md' 
+                          : 'hover:bg-gray-100 dark:bg-[#1e1e1e] hover:text-gray-900 dark:text-gray-50 dark:hover:bg-gray-800 dark:hover:text-white'
+                      }`}
+                    >
+                      <Icon size={20} className={isActive ? 'text-yellow-950' : 'text-gray-400'} />
+                      <span className="whitespace-nowrap">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="px-4 py-2">
+                <SyncIndicator />
+              </div>
+
+              <div className="p-4 border-t border-gray-200 dark:border-white/5 space-y-3">
+                <div className="flex items-center justify-between px-4 py-2">
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center text-yellow-950 font-bold text-sm flex-shrink-0">
+                      {userProfile?.nome ? userProfile.nome.charAt(0).toUpperCase() : (isAdmin ? 'AD' : 'OP')}
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
+                        {userProfile?.nome || (isAdmin ? 'Administrador' : 'Operador')}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {isAdmin ? 'Administrador' : (userProfile?.role || 'Colaborador')}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setUsuario(null);
+                      localStorage.removeItem('auth-storage');
+                      setIsMobileMenuOpen(false);
+                      router.push('/login');
+                    }}
+                    className="p-2 text-gray-400 hover:text-red-400 bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl hover:bg-red-500/10 hover:border-red-500/20 transition-all cursor-pointer flex items-center justify-center flex-shrink-0"
+                    title="Sair do Sistema"
+                  >
+                    <LogOut size={14} />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2 border-t border-gray-200 dark:border-white/5 pt-3">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold">Tema</span>
+                  <ThemeToggle />
+                </div>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
       <main className={`flex-1 p-4 md:p-8 overflow-y-auto ${!isSupabaseConfigured ? 'md:mt-12' : ''}`}>
         <div className="max-w-7xl mx-auto">
