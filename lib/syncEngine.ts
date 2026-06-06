@@ -42,6 +42,43 @@ class CodelmaqSyncEngine {
     return { ...this.status };
   }
 
+  // Pre-flight check: returns the subset of given ids that do NOT exist in the given Supabase table.
+  // Uses a single batched SELECT to avoid FK violation spam from the DB. Empty/null ids are
+  // treated as "not required" (valid for nullable FK columns with ON DELETE SET NULL).
+  public async verifyReferencesExist(
+    table: 'ativos' | 'funcionarios' | 'frentes_servico',
+    ids: Array<string | null | undefined>
+  ): Promise<{ existing: Set<string>; missing: string[] }> {
+    const unique = Array.from(new Set(ids.filter((x): x is string => !!x && typeof x === 'string')));
+    if (unique.length === 0) return { existing: new Set(), missing: [] };
+
+    try {
+      const { data, error } = await supabase
+        .from(table)
+        .select('id')
+        .in('id', unique);
+
+      if (error) {
+        console.warn(`[syncEngine] verifyReferencesExist(${table}) query failed, falling back to optimistic push:`, error.message);
+        // On query failure, assume all exist so we still attempt to sync (and rely on the
+        // 23503 catch-block to mark records as failed with a real DB error message).
+        return { existing: new Set(unique), missing: [] };
+      }
+
+      const existing = new Set<string>((data || []).map((row: any) => row.id as string));
+      const missing = unique.filter((id) => !existing.has(id));
+      return { existing, missing };
+    } catch (e) {
+      console.warn(`[syncEngine] verifyReferencesExist(${table}) threw, falling back to optimistic push:`, e);
+      return { existing: new Set(unique), missing: [] };
+    }
+  }
+
+  // Backwards-compat shim — kept so any external callers still compile.
+  public async verifyMachinesExist(machineIds: string[]) {
+    return this.verifyReferencesExist('ativos', machineIds);
+  }
+
   // Check the queue count of local unsynced records
   public async countPendingRecords(): Promise<number> {
     try {
@@ -109,16 +146,62 @@ class CodelmaqSyncEngine {
 
       // 2. Sync Checklists
       const pendingChecklists = await localDb.checklists.where('synced').equals(0).toArray();
-      for (const localChk of pendingChecklists) {
+
+      // Pre-flight: detect missing FK targets (machine + supervisor) in batched SELECTs,
+      // mark orphan records as failed so the user keeps their work in the local queue.
+      if (pendingChecklists.length > 0) {
+        const chkMachineIds = pendingChecklists.map((c) => c.machineId);
+        const chkSupervisorIds = pendingChecklists.map((c) => c.supervisorId);
+
+        const [machineCheck, supervisorCheck] = await Promise.all([
+          this.verifyReferencesExist('ativos', chkMachineIds),
+          this.verifyReferencesExist('funcionarios', chkSupervisorIds)
+        ]);
+
+        const missingMachines = new Set(machineCheck.missing);
+        const missingSupervisors = new Set(supervisorCheck.missing);
+        const blockedIds = new Set<string>();
+        const failureReasons = new Map<string, string>();
+
+        for (const chk of pendingChecklists) {
+          if (missingMachines.has(chk.machineId)) {
+            failureReasons.set(
+              chk.id,
+              `Equipamento "${chk.machineId}" não existe no servidor. Crie o cadastro do ativo na tela de Frota ou descarte este registro na Fila Local.`
+            );
+            blockedIds.add(chk.id);
+          } else if (missingSupervisors.has(chk.supervisorId)) {
+            failureReasons.set(
+              chk.id,
+              `Operador/Supervisor "${chk.supervisorId}" não existe no servidor. Cadastre o funcionário ou descarte este registro.`
+            );
+            blockedIds.add(chk.id);
+          }
+        }
+
+        for (const [id, msg] of failureReasons) {
+          await localDb.checklists.update(id, { sync_failed: 1, sync_error: msg });
+          this.status.errors.push({ table: 'checklists', id, message: msg });
+          this.notifyAll();
+        }
+
+        var syncableChecklists = pendingChecklists.filter((c) => !blockedIds.has(c.id));
+      } else {
+        var syncableChecklists: typeof pendingChecklists = [];
+      }
+
+      for (const localChk of syncableChecklists) {
         try {
           // Auto-heal invalid UUIDs (like simulated-xxxx)
           const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(localChk.id);
           let finalPayload = mapChecklistToDB(localChk);
-          
+          let workingId = localChk.id;
+
           if (!isUuid) {
             console.warn(`Healing invalid UUID for checklist: ${localChk.id}`);
-             const newId = genId();
+            const newId = genId();
             finalPayload.id = newId;
+            workingId = newId;
             // Update local ID to prevent future sync failures with same wrong ID
             await localDb.checklists.update(localChk.id, { id: newId });
           }
@@ -128,29 +211,38 @@ class CodelmaqSyncEngine {
             .upsert(finalPayload);
 
           if (error) {
-            // Handle Foreign Key violation (23503) specifically
+            // Handle Foreign Key violation (23503) specifically — keep the record, mark as failed.
             if (error.code === '23503') {
-              console.error(`FK violation for checklist ${localChk.id}: ${error.details}`);
+              console.error(`FK violation for checklist ${workingId}: ${error.details}`);
+              const detail = (error.details || '').toLowerCase();
+              let errMsg: string;
+              if (detail.includes('funcionarios')) {
+                errMsg = `Operador/Supervisor "${localChk.supervisorId}" não existe no servidor. Cadastre o funcionário ou descarte este registro.`;
+              } else if (detail.includes('ativos')) {
+                errMsg = `Equipamento "${localChk.machineId}" não existe no servidor. Crie o cadastro do ativo ou descarte este registro.`;
+              } else {
+                errMsg = `Violação de chave estrangeira: ${error.details || error.message}. Revise o registro na Fila Local.`;
+              }
+              await localDb.checklists.update(workingId, { sync_failed: 1, sync_error: errMsg });
               this.status.errors.push({
                 table: 'checklists',
-                id: localChk.id,
-                message: `Equipamento referenciado (${localChk.machineId}) não existe no servidor. Registro removido localmente.`
+                id: workingId,
+                message: errMsg
               });
-              // CRITICAL: Remove the orphan record to unblock the queue
-              await localDb.checklists.delete(localChk.id);
               this.notifyAll();
-              continue; 
+              continue;
             }
 
-            // Handle invalid integer/type (22P02)
+            // Handle invalid integer/type (22P02) — also non-destructive now.
             if (error.code === '22P02') {
-              console.error(`Invalid data type for checklist ${localChk.id}: ${error.message}`);
+              console.error(`Invalid data type for checklist ${workingId}: ${error.message}`);
+              const errMsg = `Dados numéricos inválidos detectados no registro. Revise o horímetro/km e tente novamente.`;
+              await localDb.checklists.update(workingId, { sync_failed: 1, sync_error: errMsg });
               this.status.errors.push({
                 table: 'checklists',
-                id: localChk.id,
-                message: `Dados inválidos detectedos (texto em campo numérico). Registro removido para evitar travamento.`
+                id: workingId,
+                message: errMsg
               });
-              await localDb.checklists.delete(localChk.id);
               this.notifyAll();
               continue;
             }
@@ -158,7 +250,7 @@ class CodelmaqSyncEngine {
             // Self-healing layout fallback logic (handles columns naming schemas in our DB if required)
             if (error.message.includes("column")) {
               const fallbackPayload: any = {
-                id: localChk.id,
+                id: workingId,
                 ativo_id: localChk.machineId,
                 supervisor_id: localChk.supervisorId,
                 data: localChk.data,
@@ -173,15 +265,17 @@ class CodelmaqSyncEngine {
             }
           }
 
-          await localDb.checklists.update(localChk.id, { synced: 1 });
+          await localDb.checklists.update(workingId, { synced: 1, sync_failed: 0, sync_error: undefined });
           this.status.syncedCount++;
           this.notifyAll();
         } catch (err: any) {
           console.error(`Erro ao sincronizar checklist ${localChk.id}:`, err);
+          const errMsg = err.message || 'Erro durante a sincronização de checklist';
+          await localDb.checklists.update(localChk.id, { sync_failed: 1, sync_error: errMsg });
           this.status.errors.push({
             table: 'checklists',
             id: localChk.id,
-            message: err.message || 'Erro durante a sincronização de checklist'
+            message: errMsg
           });
           this.notifyAll();
         }
@@ -189,17 +283,71 @@ class CodelmaqSyncEngine {
 
       // 3. Sync Daily Logs
       const pendingRegs = await localDb.registrosDiarios.where('synced').equals(0).toArray();
-      for (const localReg of pendingRegs) {
+
+      // Pre-flight: detect missing FK targets (machine + operator + site) in batched SELECTs.
+      if (pendingRegs.length > 0) {
+        const regMachineIds = pendingRegs.map((r) => r.machineId);
+        const regOperatorIds = pendingRegs.map((r) => r.operatorId);
+        const regSiteIds = pendingRegs.map((r) => r.siteId);
+
+        const [machineCheck, operatorCheck, siteCheck] = await Promise.all([
+          this.verifyReferencesExist('ativos', regMachineIds),
+          this.verifyReferencesExist('funcionarios', regOperatorIds),
+          this.verifyReferencesExist('frentes_servico', regSiteIds)
+        ]);
+
+        const missingMachines = new Set(machineCheck.missing);
+        const missingOperators = new Set(operatorCheck.missing);
+        const missingSites = new Set(siteCheck.missing);
+        const blockedIds = new Set<string>();
+        const failureReasons = new Map<string, string>();
+
+        for (const reg of pendingRegs) {
+          if (missingMachines.has(reg.machineId)) {
+            failureReasons.set(
+              reg.id,
+              `Equipamento "${reg.machineId}" não existe no servidor. Crie o cadastro do ativo na tela de Frota ou descarte este registro na Fila Local.`
+            );
+            blockedIds.add(reg.id);
+          } else if (missingOperators.has(reg.operatorId)) {
+            failureReasons.set(
+              reg.id,
+              `Operador "${reg.operatorId}" não existe no servidor. Cadastre o funcionário ou descarte este registro.`
+            );
+            blockedIds.add(reg.id);
+          } else if (reg.siteId && missingSites.has(reg.siteId)) {
+            failureReasons.set(
+              reg.id,
+              `Frente de serviço "${reg.siteId}" não existe no servidor. Cadastre a frente de serviço ou descarte este registro.`
+            );
+            blockedIds.add(reg.id);
+          }
+        }
+
+        for (const [id, msg] of failureReasons) {
+          await localDb.registrosDiarios.update(id, { sync_failed: 1, sync_error: msg });
+          this.status.errors.push({ table: 'registros_diarios', id, message: msg });
+          this.notifyAll();
+        }
+
+        var syncableRegs = pendingRegs.filter((r) => !blockedIds.has(r.id));
+      } else {
+        var syncableRegs: typeof pendingRegs = [];
+      }
+
+      for (const localReg of syncableRegs) {
         try {
           // Auto-heal invalid UUIDs
           const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(localReg.id);
           let finalPayload = mapLogToDB(localReg);
+          let workingId = localReg.id;
           
           if (!isUuid) {
-             console.warn(`Healing invalid UUID for registro_diario: ${localReg.id}`);
+            console.warn(`Healing invalid UUID for registro_diario: ${localReg.id}`);
             const newId = genId();
-             finalPayload.id = newId;
-             await localDb.registrosDiarios.update(localReg.id, { id: newId });
+            finalPayload.id = newId;
+            workingId = newId;
+            await localDb.registrosDiarios.update(localReg.id, { id: newId });
           }
 
           const { error } = await supabase
@@ -207,35 +355,47 @@ class CodelmaqSyncEngine {
             .upsert(finalPayload);
 
           if (error) {
-            // Handle Foreign Key violation (23503) specifically
+            // Handle Foreign Key violation (23503) — non-destructive: mark as failed.
             if (error.code === '23503') {
-              console.error(`FK violation for registro_diario ${localReg.id}: ${error.details}`);
+              console.error(`FK violation for registro_diario ${workingId}: ${error.details}`);
+              const detail = (error.details || '').toLowerCase();
+              let errMsg: string;
+              if (detail.includes('funcionarios')) {
+                errMsg = `Operador "${localReg.operatorId}" não existe no servidor. Cadastre o funcionário ou descarte este registro.`;
+              } else if (detail.includes('ativos')) {
+                errMsg = `Equipamento "${localReg.machineId}" não existe no servidor. Crie o cadastro do ativo ou descarte este registro.`;
+              } else if (detail.includes('frentes_servico')) {
+                errMsg = `Frente de serviço "${localReg.siteId}" não existe no servidor. Cadastre a frente de serviço ou descarte este registro.`;
+              } else {
+                errMsg = `Violação de chave estrangeira: ${error.details || error.message}. Revise o registro na Fila Local.`;
+              }
+              await localDb.registrosDiarios.update(workingId, { sync_failed: 1, sync_error: errMsg });
               this.status.errors.push({
                 table: 'registros_diarios',
-                id: localReg.id,
-                message: `Equipamento (${localReg.machineId}) ou Operador não existe no servidor. Registro removido.`
+                id: workingId,
+                message: errMsg
               });
-              await localDb.registrosDiarios.delete(localReg.id);
               this.notifyAll();
-              continue; 
+              continue;
             }
 
-            // Handle invalid integer/type (22P02)
+            // Handle invalid integer/type (22P02) — non-destructive.
             if (error.code === '22P02') {
-              console.error(`Invalid data type for registro_diario ${localReg.id}: ${error.message}`);
+              console.error(`Invalid data type for registro_diario ${workingId}: ${error.message}`);
+              const errMsg = `Dados numéricos inválidos detectados (horímetro/km). Revise os valores e tente novamente.`;
+              await localDb.registrosDiarios.update(workingId, { sync_failed: 1, sync_error: errMsg });
               this.status.errors.push({
                 table: 'registros_diarios',
-                id: localReg.id,
-                message: `Dados numéricos inválidos encontrados. Registro removido.`
+                id: workingId,
+                message: errMsg
               });
-              await localDb.registrosDiarios.delete(localReg.id);
               this.notifyAll();
               continue;
             }
 
             if (error.message.includes("column")) {
               const fallbackPayload: any = {
-                id: localReg.id,
+                id: workingId,
                 ativo_id: localReg.machineId,
                 operador_id: localReg.operatorId,
                 frente_servico_id: localReg.siteId,
@@ -253,15 +413,17 @@ class CodelmaqSyncEngine {
             }
           }
 
-          await localDb.registrosDiarios.update(localReg.id, { synced: 1 });
+          await localDb.registrosDiarios.update(workingId, { synced: 1, sync_failed: 0, sync_error: undefined });
           this.status.syncedCount++;
           this.notifyAll();
         } catch (err: any) {
           console.error(`Erro ao sincronizar parte diária ${localReg.id}:`, err);
+          const errMsg = err.message || 'Erro durante a sincronização de parte diária';
+          await localDb.registrosDiarios.update(localReg.id, { sync_failed: 1, sync_error: errMsg });
           this.status.errors.push({
             table: 'registros_diarios',
             id: localReg.id,
-            message: err.message || 'Erro durante a sincronização de parte diária'
+            message: errMsg
           });
           this.notifyAll();
         }

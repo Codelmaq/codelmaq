@@ -92,44 +92,48 @@ export const DashboardView = ({ machines, maintenances, logs, alerts }: any) => 
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-[#151515] p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center space-x-4">
-          <div className="p-3 bg-gray-100 dark:bg-[#1e1e1e] rounded-lg text-gray-600 dark:text-gray-300">
-            <Truck size={24} />
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+        <div className="bg-white dark:bg-[#151515] p-3 sm:p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center space-x-2 sm:space-x-4">
+          <div className="p-2 sm:p-3 bg-gray-100 dark:bg-[#1e1e1e] rounded-lg text-gray-600 dark:text-gray-300 flex-shrink-0">
+            <Truck size={20} className="sm:hidden" />
+            <Truck size={24} className="hidden sm:block" />
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total de Equipamentos</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-50">{total}</p>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-sm font-medium text-gray-500 dark:text-gray-400 leading-tight">Total de Equipamentos</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50">{total}</p>
           </div>
         </div>
         
-        <div className="bg-white dark:bg-[#151515] p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center space-x-4">
-          <div className="p-3 bg-blue-50 rounded-lg text-blue-600">
-            <Clock size={24} />
+        <div className="bg-white dark:bg-[#151515] p-3 sm:p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center space-x-2 sm:space-x-4">
+          <div className="p-2 sm:p-3 bg-blue-50 rounded-lg text-blue-600 flex-shrink-0">
+            <Clock size={20} className="sm:hidden" />
+            <Clock size={24} className="hidden sm:block" />
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Em Operação</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-50">{emOperacao}</p>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-[#151515] p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center space-x-4">
-          <div className="p-3 bg-green-50 rounded-lg text-green-600">
-            <CheckCircle size={24} />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Disponíveis no Pátio</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-50">{disponivel}</p>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-sm font-medium text-gray-500 dark:text-gray-400 leading-tight">Em Operação</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50">{emOperacao}</p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#151515] p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center space-x-4">
-          <div className="p-3 bg-red-50 rounded-lg text-red-600">
-            <Wrench size={24} />
+        <div className="bg-white dark:bg-[#151515] p-3 sm:p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center space-x-2 sm:space-x-4">
+          <div className="p-2 sm:p-3 bg-green-50 rounded-lg text-green-600 flex-shrink-0">
+            <CheckCircle size={20} className="sm:hidden" />
+            <CheckCircle size={24} className="hidden sm:block" />
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Em Manutenção</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-gray-50">{emManutencao}</p>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-sm font-medium text-gray-500 dark:text-gray-400 leading-tight">Disponíveis no Pátio</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50">{disponivel}</p>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-[#151515] p-3 sm:p-6 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm flex items-center space-x-2 sm:space-x-4">
+          <div className="p-2 sm:p-3 bg-red-50 rounded-lg text-red-600 flex-shrink-0">
+            <Wrench size={20} className="sm:hidden" />
+            <Wrench size={24} className="hidden sm:block" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-sm font-medium text-gray-500 dark:text-gray-400 leading-tight">Em Manutenção</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50">{emManutencao}</p>
           </div>
         </div>
       </div>
@@ -287,7 +291,7 @@ export const MachinesView = ({ machines, onEditMachine, onRemoveMachine }: any) 
             <input 
               type="text" 
               placeholder="Buscar por ID, Tipo ou Marca..." 
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition-all"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -706,13 +710,13 @@ export const AdminView = ({
                 value={newEmployeeName}
                 onChange={(e) => setNewEmployeeName(e.target.value)}
                 placeholder="Nome completo..." 
-                className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm bg-white dark:bg-[#151515]"
+                className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 text-sm"
               />
               <div className="flex gap-2">
                 <select 
                   value={newEmployeeRole}
                   onChange={(e) => setNewEmployeeRole(e.target.value)}
-                  className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm bg-white dark:bg-[#151515]"
+                  className="flex-1 p-2 border border-gray-300 dark:border-zinc-700 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100"
                 >
                   <option value="Operador de Máquinas">Operador de Máquinas</option>
                   <option value="Motorista">Motorista</option>
@@ -736,7 +740,7 @@ export const AdminView = ({
                 value={employeeSearch}
                 onChange={(e) => setEmployeeSearch(e.target.value)}
                 placeholder="Buscar por nome..."
-                className="w-full p-1.5 pl-8 text-xs border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 bg-white dark:bg-[#151515]"
+                className="w-full p-1.5 pl-8 text-xs border border-gray-300 dark:border-zinc-700 rounded-md focus:ring-yellow-500 focus:border-yellow-500 bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500"
               />
             </div>
             
@@ -744,7 +748,7 @@ export const AdminView = ({
               <select
                 value={employeeRoleFilter}
                 onChange={(e) => setEmployeeRoleFilter(e.target.value)}
-                className="p-1 px-1.5 text-[11px] border border-gray-300 rounded-md bg-white dark:bg-[#151515] text-gray-700 dark:text-gray-200"
+                className="p-1 px-1.5 text-[11px] border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-700 dark:text-gray-200"
               >
                 <option value="Todos">Cargos: Todos</option>
                 <option value="Operador de Máquinas">Operador de Máquinas</option>
@@ -757,7 +761,7 @@ export const AdminView = ({
               <select
                 value={employeeStatusFilter}
                 onChange={(e) => setEmployeeStatusFilter(e.target.value)}
-                className="p-1 px-1.5 text-[11px] border border-gray-300 rounded-md bg-white dark:bg-[#151515] text-gray-700 dark:text-gray-200"
+                className="p-1 px-1.5 text-[11px] border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-700 dark:text-gray-200"
               >
                 <option value="Todos">Status: Todos</option>
                 <option value="aprovado">Aprovados</option>
@@ -841,7 +845,7 @@ export const AdminView = ({
                 value={newSite}
                 onChange={(e) => setNewSite(e.target.value)}
                 placeholder="Nome da obra ou local..." 
-                className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm"
+                className="flex-1 p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 text-sm"
               />
               <button type="submit" className="bg-yellow-500 hover:bg-yellow-600 text-yellow-950 px-3 py-2 rounded-md font-semibold text-sm transition-colors">
                 Add
@@ -951,19 +955,19 @@ export const AdminView = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">ID da Frota</label>
-                  <input name="id" defaultValue={editingMachine?.id} disabled={!!editingMachine} required type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 disabled:bg-gray-100 dark:bg-[#1e1e1e]" placeholder="Ex: CAM-005" />
+                  <input name="id" defaultValue={editingMachine?.id} disabled={!!editingMachine} required type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 disabled:bg-gray-100 dark:disabled:bg-[#101010] disabled:text-gray-600 dark:disabled:text-zinc-400" placeholder="Ex: CAM-005" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Tipo de Equipamento</label>
-                  <input name="type" defaultValue={editingMachine?.type} required type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: Caminhão Basculante" />
+                  <input name="type" defaultValue={editingMachine?.type} required type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: Caminhão Basculante" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Marca</label>
-                  <input name="brand" defaultValue={editingMachine?.brand} required type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: Mercedes" />
+                  <input name="brand" defaultValue={editingMachine?.brand} required type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: Mercedes" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Modelo</label>
-                  <input name="model" defaultValue={editingMachine?.model} required type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: Actros" />
+                  <input name="model" defaultValue={editingMachine?.model} required type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: Actros" />
                 </div>
                 <div className="col-span-1 sm:col-span-2 bg-gray-50 dark:bg-[#101010] p-3 rounded border border-gray-200 dark:border-white/10">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Qual é a métrica de desgaste principal?</label>
@@ -980,39 +984,39 @@ export const AdminView = ({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Ano</label>
-                  <input name="year" defaultValue={editingMachine?.year} required type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: 2024 ou 2010/2011" />
+                  <input name="year" defaultValue={editingMachine?.year} required type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: 2024 ou 2010/2011" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{editingMachine ? 'Leitura Atual (H/KM)' : 'Leitura Inicial (H/KM)'}</label>
-                  <input name="horimeter" defaultValue={editingMachine?.horimeter} required type="number" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="0" />
+                  <input name="horimeter" defaultValue={editingMachine?.horimeter} required type="number" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="0" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Espécie/Tipo</label>
-                  <input name="specieType" defaultValue={editingMachine?.specieType} type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: TOCO, TRUCADO" />
+                  <input name="specieType" defaultValue={editingMachine?.specieType} type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: TOCO, TRUCADO" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Carroceria</label>
-                  <input name="bodywork" defaultValue={editingMachine?.bodywork} type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: CAÇAMBA BASCULANTE" />
+                  <input name="bodywork" defaultValue={editingMachine?.bodywork} type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Ex: CAÇAMBA BASCULANTE" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Chassi</label>
-                  <input name="chassis" defaultValue={editingMachine?.chassis} type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="Chassi" />
+                  <input name="chassis" defaultValue={editingMachine?.chassis} type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Chassi" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Placa</label>
-                  <input name="plate" defaultValue={editingMachine?.plate} type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="Placa" />
+                  <input name="plate" defaultValue={editingMachine?.plate} type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Placa" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Renavam</label>
-                  <input name="renavam" defaultValue={editingMachine?.renavam} type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="Renavam" />
+                  <input name="renavam" defaultValue={editingMachine?.renavam} type="text" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Renavam" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">R$ Implemento</label>
-                  <input name="implementValue" defaultValue={editingMachine?.implementValue} type="number" step="0.01" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" placeholder="0.00" />
+                  <input name="implementValue" defaultValue={editingMachine?.implementValue} type="number" step="0.01" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="0.00" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Status</label>
-                  <select name="status" defaultValue={editingMachine?.status || 'Disponível'} className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 bg-white dark:bg-[#151515]">
+                  <select name="status" defaultValue={editingMachine?.status || 'Disponível'} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500">
                     <option value="Disponível">Disponível</option>
                     <option value="Em Operação">Em Operação</option>
                     <option value="Em Manutenção">Em Manutenção</option>

@@ -9,6 +9,30 @@
   h1, h2, h3, h4, .font-heading {
     font-family: 'Rajdhani', sans-serif;
   }
+
+  /* === Contraste de campos de formulário no modo escuro ===
+     Garante que todo input/select/textarea tenha fundo escuro e texto claro,
+     evitando campos ilegíveis em modais, filtros e formulários. */
+  .dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+  .dark select,
+  .dark textarea {
+    background-color: #1e1e1e;
+    color: #f3f4f6; /* gray-100 */
+    border-color: #3f3f46; /* zinc-700 */
+  }
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: #71717a; /* zinc-500 */
+  }
+  .dark input:disabled,
+  .dark select:disabled,
+  .dark textarea:disabled {
+    background-color: #101010;
+    color: #a1a1aa; /* zinc-400 */
+  }
+  .dark {
+    color-scheme: dark;
+  }
 }
 
 /* Custom Scrollbar */

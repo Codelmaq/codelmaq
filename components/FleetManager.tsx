@@ -4,7 +4,8 @@ import {
   LayoutDashboard, Truck, Wrench, ShieldCheck, X,
   ClipboardList, Cog, Gauge, BarChart3, Briefcase, Menu,
   FileText, Fuel, Droplets, Trophy, AlertTriangle,
-  Users, ChevronRight, ChevronLeft, Smartphone, LogOut, Sparkles
+  Users, ChevronRight, ChevronLeft, LogOut, Sparkles,
+  QrCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -18,6 +19,8 @@ import { WorkshopView, ManagementView, ReportsView, FuelTruckView, PerformanceVi
 import { MaintenancePlansView } from './MaintenancePlansView';
 import { ProfileView } from './ProfileView';
 import MobileApkHub from './MobileApkHub';
+import { QrCodeManager } from './QrCodeManager';
+import { ActiveShiftBanner } from './ActiveShiftBanner';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { 
   mapDBToMachine, mapMachineToDB, 
@@ -1283,7 +1286,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
       { id: 'maintenance', label: 'Ordens de Serviço', icon: Wrench, path: '/ordens-servico' },
       { id: 'reports', label: 'Métricas em Campo', icon: BarChart3, path: '/relatorios' },
       { id: 'admin', label: 'Painel Administrativo', icon: ShieldCheck, path: '/configuracoes' },
-      { id: 'mobile-hub', label: 'Centro Mobile APK', icon: Smartphone, path: '/mobile-hub' },
+      { id: 'qr-codes', label: 'QR Codes da Frota', icon: QrCode, path: '/qr-codes' },
     ];
     
     if (isAdmin) {
@@ -1297,15 +1300,13 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
         item.id === 'daily-logs' || 
         item.id === 'performance' || 
         item.id === 'fuel-truck' || 
-        item.id === 'workshop' || 
-        item.id === 'mobile-hub'
+        item.id === 'workshop'
       );
     }
     
     return items.filter(item => 
       item.id === 'daily-logs' || 
-      item.id === 'performance' || 
-      item.id === 'mobile-hub'
+      item.id === 'performance'
     );
   }, [isAdmin, userProfile]);
 
@@ -1315,8 +1316,8 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
       const roleNormalized = (userProfile.role || 'colaborador').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       
       const allowedViews = roleNormalized === 'mecanico'
-        ? ['daily-logs', 'performance', 'fuel-truck', 'workshop', 'mobile-hub']
-        : ['daily-logs', 'performance', 'mobile-hub'];
+        ? ['daily-logs', 'performance', 'fuel-truck', 'workshop']
+        : ['daily-logs', 'performance'];
         
       if (!allowedViews.includes(currentView)) {
         console.log("Security redirect: user role", userProfile.role, "attempted to access", currentView);
@@ -1394,7 +1395,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
         </div>
 
         <div className="px-4 py-2 mt-auto">
-          <SyncIndicator />
+          <SyncIndicator machines={machines} employees={employees} />
         </div>
 
         <div className="p-4 border-t border-gray-800">
@@ -1500,7 +1501,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
               </div>
 
               <div className="px-4 py-2">
-                <SyncIndicator compact />
+                <SyncIndicator compact machines={machines} employees={employees} />
               </div>
 
               <div className="p-4 border-t border-gray-200 dark:border-white/5 space-y-3">
@@ -1550,6 +1551,8 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
         )}
       </AnimatePresence>
 
+      <ActiveShiftBanner />
+
       <main className={`flex-1 p-4 md:p-8 overflow-y-auto ${!isSupabaseConfigured ? 'md:mt-12' : ''}`}>
         <div className="max-w-7xl mx-auto">
           {currentView === 'dashboard' && isAdmin && (
@@ -1559,8 +1562,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-[#101010]/30 border border-[#7c4ff0]/20 dark:border-[#a17af0]/15 shadow-sm rounded-2xl p-4">
                 <div>
-                  <h3 className="text-sm font-bold text-[#7c4ff0] dark:text-[#a17af0] font-heading uppercase flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4 text-[#7c4ff0] dark:text-[#a17af0] animate-pulse" />
+                  <h3 className="text-sm font-bold text-[#eab308] dark:text-[#eab308] font-heading uppercase">
                     Canal de Entrada de Dados de Frota
                   </h3>
                   <p className="text-[11px] text-gray-500 dark:text-gray-400">Selecione o método operacional de apontamento de checklist e horários.</p>
@@ -1655,8 +1657,11 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
               onCleanupLocalData={handleCleanupLocalData}
             />
           )}
-          {currentView === 'mobile-hub' && (
+          {currentView === 'mobile-hub' && isAdmin && (
             <MobileApkHub />
+          )}
+          {currentView === 'qr-codes' && isAdmin && (
+            <QrCodeManager machines={machines} />
           )}
           {currentView === 'profile' && (
             <ProfileView userProfile={userProfile} />

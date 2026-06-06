@@ -12,7 +12,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { generateDailyLogsPDF } from '@/lib/pdfUtils';
-import { genId } from '@/lib/utils';
+import { genId, formatDateBR, safeTimeOf } from '@/lib/utils';
 
 const formatOSId = (id: string) => {
   if (!id) return '';
@@ -67,15 +67,20 @@ export const MaintenanceView = ({ maintenances, machines, onDeleteMaintenance, o
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Controle de Manutenção</h2>
-        <button 
-          onClick={() => setIsNewOSModalOpen(true)}
-          className="bg-black hover:bg-neutral-800 text-white font-semibold py-2 px-4 rounded-lg flex items-center transition-colors"
-        >
-          <Plus size={18} className="mr-2" />
-          Nova OS
-        </button>
+      <div className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Controle de Manutenção</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Abertura, acompanhamento e conclusão de ordens de serviço.</p>
+        </div>
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+          <button 
+            onClick={() => setIsNewOSModalOpen(true)}
+            className="bg-black hover:bg-neutral-800 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center transition-colors text-sm"
+          >
+            <Plus size={18} className="mr-2" />
+            Nova OS
+          </button>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-[#151515] rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
@@ -102,7 +107,7 @@ export const MaintenanceView = ({ maintenances, machines, onDeleteMaintenance, o
                     <div className="text-sm font-medium text-gray-900 dark:text-gray-50">{m.machineId}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">{m.type}</div>
                   </td>
-                  <td className="p-4 text-sm text-gray-600 dark:text-gray-300">{new Date(m.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                  <td className="p-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{formatDateBR(m.date)}</td>
                   <td className="p-4 text-sm text-gray-700 dark:text-gray-200 max-w-xs truncate" title={m.description}>{m.description}</td>
                   <td className="p-4 text-sm text-gray-600 dark:text-gray-300">{m.type_maintenance}</td>
                   <td className="p-4"><UrgencyBadge urgency={m.urgency} /></td>
@@ -147,7 +152,7 @@ export const MaintenanceView = ({ maintenances, machines, onDeleteMaintenance, o
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <div className="font-bold text-gray-900 dark:text-gray-50">{formatOSId(m.id)}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">{new Date(m.date + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">{formatDateBR(m.date)}</div>
                 </div>
                 <div className="flex gap-2">
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -268,7 +273,7 @@ export const MaintenanceView = ({ maintenances, machines, onDeleteMaintenance, o
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Equipamento</label>
-                  <select name="machineId" required className="w-full p-2 border border-gray-300 rounded-md focus:ring-black focus:border-black">
+                  <select name="machineId" required className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 dark:focus:ring-yellow-400 dark:focus:border-yellow-400">
                     <option value="">Selecione...</option>
                     {machines.map((m: any) => (
                       <option key={m.id} value={m.id}>{m.id} - {m.type}</option>
@@ -277,13 +282,13 @@ export const MaintenanceView = ({ maintenances, machines, onDeleteMaintenance, o
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Data Agendada</label>
-                  <input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-gray-300 rounded-md focus:ring-black focus:border-black" />
+                  <input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 dark:focus:ring-yellow-400 dark:focus:border-yellow-400" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Tipo de Manutenção</label>
-                <select name="type_maintenance" required className="w-full p-2 border border-gray-300 rounded-md focus:ring-black focus:border-black">
+                <select name="type_maintenance" required className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 dark:focus:ring-yellow-400 dark:focus:border-yellow-400">
                   <option value="Corretiva">Corretiva</option>
                   <option value="Preventiva">Preventiva</option>
                   <option value="Preditiva">Preditiva</option>
@@ -292,7 +297,7 @@ export const MaintenanceView = ({ maintenances, machines, onDeleteMaintenance, o
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Urgência</label>
-                <select name="urgency" required className="w-full p-2 border border-gray-300 rounded-md focus:ring-black focus:border-black">
+                <select name="urgency" required className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 dark:focus:ring-yellow-400 dark:focus:border-yellow-400">
                   <option value="Baixa">Baixa</option>
                   <option value="Média">Média</option>
                   <option value="Alta">Alta</option>
@@ -301,7 +306,7 @@ export const MaintenanceView = ({ maintenances, machines, onDeleteMaintenance, o
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Descrição do Problema / Serviço</label>
-                <textarea name="description" required rows={4} className="w-full p-2 border border-gray-300 rounded-md focus:ring-black focus:border-black" placeholder="Descreva o que precisa ser feito..."></textarea>
+                <textarea name="description" required rows={4} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 dark:focus:ring-yellow-400 dark:focus:border-yellow-400" placeholder="Descreva o que precisa ser feito..."></textarea>
               </div>
 
               <div className="flex gap-3 justify-end pt-4">
@@ -406,7 +411,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
       }
       
       return [
-        new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR'),
+        formatDateBR(log.date),
         log.id,
         log.machineId,
         getOperatorName(log.operator),
@@ -610,7 +615,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                 <tbody className="divide-y divide-blue-100">
                   {openLogs.map((log: any) => (
                     <tr key={log.id} className="hover:bg-blue-100/30 transition-colors">
-                      <td className="p-4 text-sm font-medium">{new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                      <td className="p-4 text-sm font-medium whitespace-nowrap">{formatDateBR(log.date)}</td>
                       <td className="p-4 text-sm font-bold">{log.machineId}</td>
                       <td className="p-4 text-sm">{getOperatorName(log.operator)}</td>
                       <td className="p-4 text-sm font-mono">{log.startHorimeter}</td>
@@ -640,7 +645,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
               <input 
                 type="text" 
                 placeholder="Buscar Veículo ou Operador..." 
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition-all"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -673,7 +678,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                   return (
                     <tr key={log.id} className="hover:bg-gray-50 dark:bg-[#101010]/50 transition-colors">
                       <td className="p-4">
-                        <div className="font-semibold text-gray-900 dark:text-gray-50">{new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
+                        <div className="font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">{formatDateBR(log.date)}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">{formatPDId(log.id)}</div>
                       </td>
                       <td className="p-4">
@@ -757,7 +762,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                 <div key={log.id} className="p-4 hover:bg-gray-50 dark:bg-[#101010]/50 transition-colors">
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <div className="font-bold text-gray-900 dark:text-gray-50">{new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
+                      <div className="font-bold text-gray-900 dark:text-gray-50">{formatDateBR(log.date)}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{formatPDId(log.id)}</div>
                     </div>
                     <div className="flex gap-1">
@@ -902,7 +907,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                   const machine = machines.find((m: any) => m.id === machineId);
                   const completedLogs = logs.filter((l: any) => l.machineId === machineId && l.status === 'Concluído');
                   const lastLog = completedLogs.length > 0 
-                    ? [...completedLogs].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+                    ? [...completedLogs].sort((a: any, b: any) => safeTimeOf(b.date) - safeTimeOf(a.date))[0]
                     : null;
                   
                   setFormStartHorimeter(lastLog ? lastLog.endHorimeter : (machine ? machine.horimeter : ''));
@@ -990,8 +995,8 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                       const completedLogs = logs.filter((l: any) => l.machineId === machineId && l.status === 'Concluído');
                       const lastLog = completedLogs.length > 0 
                         ? [...completedLogs].sort((a: any, b: any) => {
-                            const dateA = new Date(a.date).getTime();
-                            const dateB = new Date(b.date).getTime();
+                            const dateA = safeTimeOf(a.date);
+                            const dateB = safeTimeOf(b.date);
                             if (dateA !== dateB) return dateB - dateA;
                             // If same date, use closedAt or id as secondary sort
                             const timeA = a.closedAt ? new Date(a.closedAt).getTime() : 0;
@@ -1201,7 +1206,7 @@ export const MaintenancePlanView = ({ machines = [], plans = [], onAddPlan, onUp
             <select 
               value={selectedMachine} 
               onChange={(e) => setSelectedMachine(e.target.value)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500 font-medium text-gray-800 dark:text-gray-100 bg-white dark:bg-[#151515]"
+              className="w-full p-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg focus:ring-yellow-500 focus:border-yellow-500 font-medium text-gray-800 dark:text-gray-100 bg-white dark:bg-[#1e1e1e]"
             >
               {machines.map((m: any) => (
                 <option key={m.id} value={m.id}>{m.id} - {m.type} ({m.brand})</option>
@@ -1386,15 +1391,15 @@ export const MaintenancePlanView = ({ machines = [], plans = [], onAddPlan, onUp
             }} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Peça / Óleo</label>
-                <input name="item" required type="text" placeholder="Ex: Filtro Diesel" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" />
+                <input name="item" required type="text" placeholder="Ex: Filtro Diesel" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Vida Útil ({activeMachine?.measureUnit})</label>
-                <input name="interval" required type="number" min="1" placeholder="Ex: 30000" className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" />
+                <input name="interval" required type="number" min="1" placeholder="Ex: 30000" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Marcador na Última Troca</label>
-                <input name="lastExchange" required type="number" min="0" defaultValue={activeMachine?.horimeter} className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" />
+                <input name="lastExchange" required type="number" min="0" defaultValue={activeMachine?.horimeter} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" />
               </div>
               
               <div className="pt-4 flex justify-end gap-2 border-t mt-6">
@@ -1445,7 +1450,7 @@ export const MaintenancePlanView = ({ machines = [], plans = [], onAddPlan, onUp
                   type="number" 
                   min={exchangeModal.plan.lastExchange} 
                   defaultValue={activeMachine.horimeter} 
-                  className="w-full p-2.5 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 font-mono text-lg bg-yellow-50" 
+                  className="w-full p-2.5 border border-gray-300 dark:border-zinc-700 rounded-md focus:ring-yellow-500 focus:border-yellow-500 font-mono text-lg bg-yellow-50 dark:bg-yellow-900/30 text-gray-900 dark:text-gray-100"
                 />
               </div>
               

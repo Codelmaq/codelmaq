@@ -245,6 +245,20 @@ export default function LoginPage() {
         return;
       }
 
+      if (email.toLowerCase() === 'mecanico@codelmaq.com.br' && password === '123456') {
+        const defaultMecanico = {
+          id: '22222222-2222-4222-b222-222222222222',
+          nome: 'Roberto Mecânico',
+          email: 'mecanico@codelmaq.com.br',
+          role: 'mecanico' as const,
+          status: 'aprovado' as const
+        };
+        setUsuario(defaultMecanico);
+        playBeep('success');
+        router.push('/parte-diaria');
+        return;
+      }
+
       // Check legacy credentials error to prevent legacy access
       if (email.toLowerCase() === 'admin' || email.toLowerCase() === 'colab') {
         throw new Error("O sistema agora utiliza e-mail real. Por favor, utilize os e-mails padrões: admin@codelmaq.com.br ou operador@codelmaq.com.br");
@@ -272,27 +286,46 @@ export default function LoginPage() {
             .single();
 
           if (perfilError) {
-            // Self-healing: create profile if missing
-            const isOwner = data.user.email?.toLowerCase() === 'ale.codelmaq1986@gmail.com';
-            const newPerfil = {
-              id: data.user.id,
-              nome: data.user.email?.split('@')[0] || 'Usuário',
-              email: data.user.email,
-              funcao: isOwner ? ('administrador' as const) : ('colaborador' as const),
-              status: isOwner ? ('aprovado' as const) : ('pendente' as const)
-            };
-
-            const { data: createdPerfil, error: createError } = await supabase
+            // Fallback: try to find a pre-registered employee by email (admin may have
+            // pre-created a mecanico in funcionarios before the user signed up).
+            const { data: preCadastrado } = await supabase
               .from('funcionarios')
-              .insert([newPerfil])
-              .select()
+              .select('*')
+              .eq('email', data.user.email)
               .single();
 
-            if (createError) {
-              console.error('Error creating profile layout:', createError);
-              perfil = newPerfil;
+            if (preCadastrado) {
+              // Adopt the pre-registered profile: keep its funcao + status, just rebind to auth id.
+              const { data: adoptedPerfil } = await supabase
+                .from('funcionarios')
+                .update({ id: data.user.id })
+                .eq('email', data.user.email)
+                .select()
+                .single();
+              perfil = adoptedPerfil || preCadastrado;
             } else {
-              perfil = createdPerfil;
+              // Truly new user — apply default role.
+              const isOwner = data.user.email?.toLowerCase() === 'ale.codelmaq1986@gmail.com';
+              const newPerfil = {
+                id: data.user.id,
+                nome: data.user.email?.split('@')[0] || 'Usuário',
+                email: data.user.email,
+                funcao: isOwner ? ('administrador' as const) : ('colaborador' as const),
+                status: isOwner ? ('aprovado' as const) : ('pendente' as const)
+              };
+
+              const { data: createdPerfil, error: createError } = await supabase
+                .from('funcionarios')
+                .insert([newPerfil])
+                .select()
+                .single();
+
+              if (createError) {
+                console.error('Error creating profile layout:', createError);
+                perfil = newPerfil;
+              } else {
+                perfil = createdPerfil;
+              }
             }
           }
 
@@ -491,6 +524,20 @@ export default function LoginPage() {
       }
     },
     {
+      code: 'CODELMAQ-MEC-003',
+      title: 'Crachá de Roberto Mecânico',
+      subtitle: 'Mecânico Sênior • Oficina e Comboio',
+      color: 'from-cyan-500 to-blue-600',
+      tag: 'MECÂNICO',
+      user: {
+        id: '22222222-2222-4222-b222-222222222222',
+        nome: 'Roberto Mecânico',
+        email: 'mecanico@codelmaq.com.br',
+        role: 'mecanico' as const,
+        status: 'aprovado' as const
+      }
+    },
+    {
       code: 'CODELMAQ-EQ-CAT320',
       title: 'QR Code da Escavadeira CAT 320',
       subtitle: 'Ativo #CAT320 • Hidráulica Premium',
@@ -525,7 +572,11 @@ export default function LoginPage() {
         // Auto sign in user after successful operator crachá reading
         setTimeout(() => {
           setUsuario(badge.user);
-          router.push(badge.user.funcao === 'administrador' ? '/dashboard' : '/parte-diaria');
+          router.push(
+            badge.user.funcao === 'administrador' 
+              ? '/dashboard' 
+              : '/parte-diaria'
+          );
         }, 1200);
       } else {
         // Scanning equipment - double beep for recognition

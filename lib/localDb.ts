@@ -5,7 +5,7 @@ export interface LocalUser {
   id: string;          // uuid or operator identifier
   nome: string;
   email: string;
-  role: 'administrador' | 'colaborador';
+  role: 'administrador' | 'colaborador' | 'mecanico';
   status: 'aprovado' | 'pendente';
   synced: number;      // 0 for offline/needs sync, 1 for online synced
 }
@@ -21,6 +21,8 @@ export interface LocalChecklist {
   status: 'aprovado' | 'atencao' | 'critico';
   answers: Record<string, boolean | string>; // checklist verification answers
   synced: number;      // 0 = pending, 1 = synced
+  sync_failed?: number; // 1 = sync attempted but failed (e.g. FK violation). Stays in queue for review.
+  sync_error?: string;  // human-readable error from the last failed sync attempt
   observacoes?: string;
   defectPhotos?: string[]; // Compressed image base64 URIs saved locally
 }
@@ -35,6 +37,8 @@ export interface LocalRegistroDiario {
   horimetroFinal: number;
   status: 'rascunho' | 'fechado';
   synced: number;      // 0 = pending, 1 = synced
+  sync_failed?: number; // 1 = sync attempted but failed (e.g. FK violation). Stays in queue for review.
+  sync_error?: string;  // human-readable error from the last failed sync attempt
   fuelAdded?: number;
   observations?: string;
   created_at?: string;
@@ -56,6 +60,13 @@ class CodelmaqLocalDatabase extends Dexie {
       users: 'id, email, role, status, synced',
       checklists: 'id, machineId, supervisorId, status, synced',
       registrosDiarios: 'id, operatorId, machineId, siteId, data, status, synced'
+    });
+
+    // v2: add sync_failed index for fast "failed records" queries in the local queue UI
+    this.version(2).stores({
+      users: 'id, email, role, status, synced',
+      checklists: 'id, machineId, supervisorId, status, synced, sync_failed',
+      registrosDiarios: 'id, operatorId, machineId, siteId, data, status, synced, sync_failed'
     });
   }
 }

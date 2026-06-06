@@ -16,15 +16,17 @@ import {
   Sparkles,
   Info,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Trash2
 } from 'lucide-react';
 
-export function SyncIndicator({ compact = false }: { compact?: boolean }) {
+export function SyncIndicator({ compact = false, machines = [], employees = [] }: { compact?: boolean; machines?: Array<{ id: string; name?: string; type?: string }>; employees?: Array<{ id: string; nome?: string; role?: string }> }) {
   const { isOnline, hasInternet, loading: isProbing, triggerForceProbe } = useNetworkStatus();
   const [syncStatus, setSyncStatus] = useState<SyncStatusReport>(syncEngine.getStatus());
   const [isSyncingLocal, setIsSyncingLocal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [failedCount, setFailedCount] = useState(0);
 
   // Subscribe to syncEngine reports
   useEffect(() => {
@@ -33,8 +35,14 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
     });
     
     // Seed and refresh counts
-    seedLocalDatabase().then(() => {
-      syncEngine.countPendingRecords();
+    seedLocalDatabase().then(async () => {
+      await syncEngine.countPendingRecords();
+      // Count failed records in the local queue
+      try {
+        const failedChk = await localDb.checklists.where('sync_failed').equals(1).count();
+        const failedLogs = await localDb.registrosDiarios.where('sync_failed').equals(1).count();
+        setFailedCount(failedChk + failedLogs);
+      } catch {}
     });
 
     return unsubscribe;
@@ -54,16 +62,28 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
     }
   };
 
-  // Simulated test local entry generation helper (to easily test offline behavior)
+  // Simulated test local entry generation helper (to easily test offline behavior).
+  // Uses a REAL machine from the fleet so the test reflects the actual sync path
+  // (not a fake id that would always fail FK validation).
   const handleGenerateOfflineTestPayload = async () => {
     try {
+      const realMachine = machines && machines.length > 0 ? machines[0] : null;
+      if (!realMachine) {
+        alert(
+          'Nenhuma máquina real carregada do servidor ainda.\n\n' +
+          'Cadastre um ativo na tela de Frota (ou aguarde a sincronização inicial) ' +
+          'e tente novamente. O simulador precisa de um ID real para gerar um rascunho sincronizável.'
+        );
+        return;
+      }
+      const realEmployee = employees && employees.length > 0 ? employees[0] : null;
+      const supervisorId = realEmployee?.id || '11111111-1111-4111-b111-111111111111';
+
       const uniqueId = genId();
-      
-      // Add simulated local offline checklist
       await localDb.checklists.add({
         id: uniqueId,
-        machineId: 'CAT320',
-        supervisorId: '11111111-1111-4111-b111-111111111111',
+        machineId: realMachine.id,
+        supervisorId: supervisorId,
         data: new Date().toISOString().split('T')[0],
         status: 'atencao',
         answers: {
@@ -72,14 +92,35 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
           pneus: true,
           freios: false
         },
-        observacoes: 'Gerado via simulador offline para auditoria de filas de sincronização técnica.',
+        observacoes: `[SIMULADOR] Rascunho gerado para teste de fila (ativo real: ${realMachine.id}).`,
         synced: 0
       });
 
-      // Recalculate pending records count
       await syncEngine.countPendingRecords();
     } catch (e) {
       console.error('Error generating mock unsynced item:', e);
+    }
+  };
+
+  // Discard all failed records in the local queue (no prompt, this is the cleanup hatch).
+  const handleDiscardAllFailed = async () => {
+    try {
+      const failedChk = await localDb.checklists.where('sync_failed').equals(1).toArray();
+      const failedLogs = await localDb.registrosDiarios.where('sync_failed').equals(1).toArray();
+      const total = failedChk.length + failedLogs.length;
+      if (total === 0) {
+        alert('Não há registros falhos para descartar.');
+        return;
+      }
+      if (!confirm(`Descartar ${total} registro(s) com falha de sincronização?`)) return;
+
+      for (const c of failedChk) await localDb.checklists.delete(c.id);
+      for (const l of failedLogs) await localDb.registrosDiarios.delete(l.id);
+
+      setFailedCount(0);
+      await syncEngine.countPendingRecords();
+    } catch (e) {
+      console.error('Discard-all-failed error:', e);
     }
   };
 
@@ -165,6 +206,23 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
 
+      {/* Failed records quick-action row */}
+      {failedCount > 0 && (
+        <div className="flex items-center justify-between gap-2 p-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl">
+          <div className="flex items-center gap-1.5 text-red-700 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider">
+            <AlertTriangle size={11} />
+            {failedCount} com falha na fila
+          </div>
+          <button
+            onClick={handleDiscardAllFailed}
+            className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white font-bold rounded-md text-[9px] uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+          >
+            <Trash2 size={10} />
+            Descartar todos
+          </button>
+        </div>
+      )}
+
       {/* Primary Sync Actions (only when NOT compact) */}
       {!compact && (
         <div className="space-y-2">
@@ -192,18 +250,24 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
 
       {/* Sync Error Board fallback alerts if offline transfers failed */}
       {syncStatus.errors.length > 0 && (
-        <div className="p-2.5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl space-y-1">
+        <div className="p-2.5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl space-y-2">
           <div className="flex items-center text-red-800 dark:text-red-400 font-heading font-bold text-[10px]">
             <AlertTriangle size={12} className="mr-1 flex-shrink-0" />
-            CONFLITOS OU TRANSMISSÃO CORROMPIDA
+            FALHA NA SINCRONIZAÇÃO
           </div>
-          <div className="max-h-16 overflow-y-auto text-[9px] text-red-700 dark:text-red-300 leading-relaxed font-mono divide-y divide-red-200 dark:divide-red-500/10">
-            {syncStatus.errors.map((e, idx) => (
-              <div key={`${e.id}-${idx}`} className="py-1 animate-pulse">
+          <div className="max-h-20 overflow-y-auto text-[9px] text-red-700 dark:text-red-300 leading-relaxed font-mono divide-y divide-red-200 dark:divide-red-500/10">
+            {syncStatus.errors.slice(0, 5).map((e, idx) => (
+              <div key={`${e.id}-${idx}`} className="py-1">
                 [{e.table}] {e.message}
               </div>
             ))}
+            {syncStatus.errors.length > 5 && (
+              <div className="py-1 italic">+{syncStatus.errors.length - 5} erro(s) omitido(s)</div>
+            )}
           </div>
+          <p className="text-[9px] text-red-700 dark:text-red-300 leading-snug">
+            Os registros <strong>não foram apagados</strong>. Abra a aba <strong>Fila Local</strong> no painel operacional para revisar, tentar novamente ou descartar.
+          </p>
         </div>
       )}
 
@@ -231,45 +295,37 @@ export function SyncIndicator({ compact = false }: { compact?: boolean }) {
       <div className="space-y-1 pt-1">
         <button 
           onClick={async () => {
-            const hasFkErrors = syncStatus.errors.some(e => e.message.includes('não existe') || e.message.includes('FK violation'));
-            const msg = hasFkErrors 
-              ? "Deseja remover os registros órfãos que estão travando a sincronia (referências a equipamentos inexistentes)?"
-              : "Deseja apagar registros locais que possuem formato de ID ou EQUIPAMENTO inválido (simulated- prefix)?";
-
-            if (confirm(msg)) {
+            if (confirm(
+              "Deseja apagar apenas registros de TESTE (prefixo 'simulated-' ou equipamento 'CAT320') do cache local?\n\n" +
+              "Registros reais com falha de sincronização NÃO serão apagados — eles ficam na Fila Local para você revisar."
+            )) {
               const checklists = await localDb.checklists.toArray();
               const logs = await localDb.registrosDiarios.toArray();
-              
-              // IDs from sync engine errors
-              const failingIds = new Set(syncStatus.errors.map(e => e.id));
 
-              // Clean checklists
+              let removed = 0;
+              // Only clean obvious test/simulated records, never user data.
               for (const c of checklists) {
-                const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.id);
-                const isOrphan = c.machineId === "CAT320" || c.machineId.startsWith("simulated-");
-                
-                if (!isUuid || c.id.startsWith("simulated-") || isOrphan || failingIds.has(c.id)) {
+                const isTest = c.id.startsWith("simulated-") || c.machineId === "CAT320";
+                if (isTest) {
                   await localDb.checklists.delete(c.id);
+                  removed++;
                 }
               }
-              
-              // Clean logs
               for (const l of logs) {
-                 const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(l.id);
-                 const isOrphan = l.machineId === "CAT320" || l.machineId.startsWith("simulated-");
-                 
-                 if (!isUuid || l.id.startsWith("simulated-") || isOrphan || failingIds.has(l.id)) {
-                   await localDb.registrosDiarios.delete(l.id);
-                 }
+                const isTest = l.id.startsWith("simulated-") || l.machineId === "CAT320";
+                if (isTest) {
+                  await localDb.registrosDiarios.delete(l.id);
+                  removed++;
+                }
               }
-              
+
               await syncEngine.countPendingRecords();
-              alert("Limpeza concluída. Os registros problemáticos e referências inválidas foram removidas.");
+              alert(`Limpeza concluída. ${removed} registro(s) de teste removido(s).`);
             }
           }}
           className="w-full text-[9px] text-red-500 hover:text-red-700 underline text-center cursor-pointer"
         >
-          Corrigir erros de sincronização (Limpar dados órfãos/corrompidos)
+          Limpar apenas rascunhos de teste do simulador
         </button>
       </div>
 

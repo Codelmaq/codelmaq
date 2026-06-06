@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { MAINTENANCE_DB, defaultChecklistItems } from '@/lib/data';
 import { generateFuelTruckPDF, generatePerformancePDF, generateFieldMetricsPDF } from '@/lib/pdfUtils';
-import { genId } from '@/lib/utils';
+import { genId, formatDateBR, safeTimeOf, safeParseDate } from '@/lib/utils';
 
 export const PerformanceView = ({ scoringRules, pointsHistory, monthlyRanking, employees, userProfile, logs }: any) => {
   const [activeTab, setActiveTab] = useState('ranking');
@@ -109,17 +109,17 @@ export const PerformanceView = ({ scoringRules, pointsHistory, monthlyRanking, e
       {/* Bento Grid — Resumo Operacional de Desempenho */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Pontuação */}
-        <div className="bg-gradient-to-br from-[#eab308]/5 to-yellow-50 border border-[#eab308]/20 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute right-3 top-3 opacity-15 text-[#eab308]">
+        <div className="bg-gradient-to-br from-amber-100 to-yellow-50 border border-amber-300/60 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute right-3 top-3 opacity-25 text-amber-600">
             <Trophy size={40} />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Pontuação Geral</p>
-            <h4 className="text-3xl font-black text-[#eab308] mt-1">{personalPointsValue} <span className="text-xs font-bold text-gray-500 dark:text-gray-400">pts</span></h4>
+            <p className="text-xs font-bold text-amber-900 uppercase tracking-wider">Pontuação Geral</p>
+            <h4 className="text-3xl font-black text-amber-900 mt-1">{personalPointsValue} <span className="text-xs font-bold text-amber-800/80">pts</span></h4>
           </div>
-          <div className="mt-4 pt-3 border-t border-[#eab308]/10 flex justify-between items-center text-xs">
-            <span className="text-gray-500 dark:text-gray-400 font-medium">Nível sugerido:</span>
-            <span className="font-extrabold uppercase text-[#eab308]">
+          <div className="mt-4 pt-3 border-t border-amber-300/60 flex justify-between items-center text-xs">
+            <span className="text-amber-900/80 font-semibold">Nível sugerido:</span>
+            <span className="font-extrabold uppercase text-amber-900 bg-amber-300/60 px-2 py-0.5 rounded-md">
               {personalPointsValue >= 900 ? '🥇 Ouro' : personalPointsValue >= 700 ? '🥈 Prata' : '🥉 Bronze'}
             </span>
           </div>
@@ -503,7 +503,7 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
             <Fuel className="mr-2 text-green-600" size={28} />
@@ -511,10 +511,10 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestão de estoque de diesel e abastecimentos da frota.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
           <button 
             onClick={() => generateFuelTruckPDF(refills, machines, stock)}
-            className="bg-[#eab308] hover:bg-yellow-600 text-yellow-950 font-semibold py-2 px-4 rounded-lg flex items-center transition-all shadow-sm"
+            className="bg-[#eab308] hover:bg-yellow-600 text-yellow-950 font-semibold py-2 px-4 rounded-lg flex items-center justify-center transition-all shadow-sm text-sm"
             title="Baixar relatório em PDF"
           >
             <Download size={18} className="mr-2" />
@@ -523,7 +523,7 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
           {isAdmin && (
             <button 
               onClick={() => setIsAdjustmentModalOpen(true)}
-              className="bg-black dark:bg-neutral-800 hover:bg-neutral-800 dark:hover:bg-neutral-700 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-all"
+              className="bg-black dark:bg-neutral-800 hover:bg-neutral-800 dark:hover:bg-neutral-700 text-white px-4 py-2 rounded-lg flex items-center justify-center shadow-sm transition-all text-sm"
             >
               <Settings size={20} className="mr-2" />
               Ajuste Manual
@@ -531,14 +531,14 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
           )}
           <button 
             onClick={() => setIsMachineRefillModalOpen(true)}
-            className="bg-black dark:bg-neutral-800 hover:bg-neutral-800 dark:hover:bg-neutral-700 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-all"
+            className="bg-black dark:bg-neutral-800 hover:bg-neutral-800 dark:hover:bg-neutral-700 text-white px-4 py-2 rounded-lg flex items-center justify-center shadow-sm transition-all text-sm"
           >
             <Truck size={20} className="mr-2" />
             Abastecer Equipamento
           </button>
           <button 
             onClick={() => setIsRefillModalOpen(true)}
-            className="bg-black dark:bg-neutral-800 hover:bg-neutral-800 dark:hover:bg-neutral-700 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-all"
+            className="bg-black dark:bg-neutral-800 hover:bg-neutral-800 dark:hover:bg-neutral-700 text-white px-4 py-2 rounded-lg flex items-center justify-center shadow-sm transition-all text-sm"
           >
             <Plus size={20} className="mr-2" />
             Registrar Recebimento (Diesel)
@@ -616,10 +616,10 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {[...refills].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((item: any) => (
+                {[...refills].sort((a: any, b: any) => safeTimeOf(b.date) - safeTimeOf(a.date)).map((item: any) => (
                   <tr key={item.id} className="hover:bg-gray-50 dark:bg-[#101010] transition-colors">
-                    <td className="p-4 text-sm text-gray-600 dark:text-gray-300">
-                      {new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                    <td className="p-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                      {formatDateBR(item.date)}
                     </td>
                     <td className="p-4">
                       <span className={`flex items-center text-xs font-bold ${item.type === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
@@ -721,22 +721,22 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
             <form className="space-y-4" onSubmit={handleAdjustmentSubmit}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Tipo de Ajuste</label>
-                <select name="type" required className="w-full p-2 border border-gray-300 rounded-md focus:ring-amber-500 focus:border-amber-500">
+                <select name="type" required className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-amber-500 focus:border-amber-500">
                   <option value="Entrada">Entrada (Aumentar Estoque)</option>
                   <option value="Débito">Saída (Diminuir Estoque)</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Quantidade (Litros)</label>
-                <input name="amount" required type="number" min="1" className="w-full p-2 border border-gray-300 rounded-md focus:ring-amber-500 focus:border-amber-500" />
+                <input name="amount" required type="number" min="1" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-amber-500 focus:border-amber-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Data</label>
-                <input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-gray-300 rounded-md focus:ring-amber-500 focus:border-amber-500" />
+                <input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-amber-500 focus:border-amber-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Motivo do Ajuste</label>
-                <input name="reason" required type="text" placeholder="Ex: Correção de erro de digitação" className="w-full p-2 border border-gray-300 rounded-md focus:ring-amber-500 focus:border-amber-500" />
+                <input name="reason" required type="text" placeholder="Ex: Correção de erro de digitação" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-amber-500 focus:border-amber-500" />
               </div>
               <div className="pt-4 flex justify-end gap-2 border-t mt-6">
                 <button type="button" onClick={() => setIsAdjustmentModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#1e1e1e] rounded-md hover:bg-gray-200">Cancelar</button>
@@ -764,21 +764,21 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
             <form className="space-y-4" onSubmit={handleEditSubmit}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Data</label>
-                <input name="date" required type={editModal.data.type === 'Entrada' ? 'date' : 'datetime-local'} defaultValue={editModal.data.date} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+                <input name="date" required type={editModal.data.type === 'Entrada' ? 'date' : 'datetime-local'} defaultValue={editModal.data.date} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Quantidade (Litros)</label>
-                <input name="amount" required type="number" min="1" defaultValue={editModal.data.amount} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+                <input name="amount" required type="number" min="1" defaultValue={editModal.data.amount} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500" />
               </div>
               {editModal.data.type === 'Entrada' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Fornecedor / Nota Fiscal</label>
-                  <input name="supplier" required type="text" defaultValue={editModal.data.supplier} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+                  <input name="supplier" required type="text" defaultValue={editModal.data.supplier} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500" />
                 </div>
               ) : (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Equipamento</label>
-                  <select name="machineId" required defaultValue={editModal.data.machineId} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                  <select name="machineId" required defaultValue={editModal.data.machineId} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500">
                     {machines.map((m: any) => (
                       <option key={m.id} value={m.id}>{m.id} - {m.model}</option>
                     ))}
@@ -811,7 +811,7 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
             <form className="space-y-4" onSubmit={handleMachineRefillSubmit}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Equipamento</label>
-                <select name="machineId" required className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                <select name="machineId" required className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500">
                   <option value="">Selecione um equipamento...</option>
                   {machines.map((m: any) => (
                     <option key={m.id} value={m.id}>{m.id} - {m.model} ({m.type})</option>
@@ -820,11 +820,11 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Data/Hora</label>
-                <input name="date" required type="datetime-local" defaultValue={new Date().toISOString().slice(0, 16)} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+                <input name="date" required type="datetime-local" defaultValue={new Date().toISOString().slice(0, 16)} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Quantidade (Litros)</label>
-                <input name="amount" required type="number" min="1" max={stock} placeholder={`Disponível: ${stock}L`} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+                <input name="amount" required type="number" min="1" max={stock} placeholder={`Disponível: ${stock}L`} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500" />
               </div>
               <div className="pt-4 flex justify-end gap-2 border-t mt-6">
                 <button type="button" onClick={() => setIsMachineRefillModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#1e1e1e] rounded-md hover:bg-gray-200">Cancelar</button>
@@ -852,15 +852,15 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
             <form className="space-y-4" onSubmit={handleRefill}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Data do Recebimento</label>
-                <input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" />
+                <input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-green-500 focus:border-green-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Quantidade (Litros)</label>
-                <input name="amount" required type="number" min="1" max={capacity - stock} placeholder={`Máximo: ${capacity - stock}L`} className="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" />
+                <input name="amount" required type="number" min="1" max={capacity - stock} placeholder={`Máximo: ${capacity - stock}L`} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-green-500 focus:border-green-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Fornecedor / Nota Fiscal</label>
-                <input name="supplier" required type="text" placeholder="Ex: Posto Ipiranga / NF 1234" className="w-full p-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500" />
+                <input name="supplier" required type="text" placeholder="Ex: Posto Ipiranga / NF 1234" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-green-500 focus:border-green-500" />
               </div>
               <div className="pt-4 flex justify-end gap-2 border-t mt-6">
                 <button type="button" onClick={() => setIsRefillModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#1e1e1e] rounded-md hover:bg-gray-200">Cancelar</button>
@@ -969,7 +969,7 @@ export const WorkshopView = ({ logs, machines, employees, plans, alerts, onAddMa
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
             <Cog className="mr-2 text-gray-600 dark:text-gray-300" size={28} />
@@ -1093,7 +1093,7 @@ export const WorkshopView = ({ logs, machines, employees, plans, alerts, onAddMa
                     {log.avariaStatus === 'Pendente Oficina' ? 'Triagem Pendente' : log.avariaStatus}
                   </div>
                   <span className="text-xs font-semibold bg-white dark:bg-[#151515] px-2 py-1 rounded shadow-sm border border-black/10">
-                    {new Date(log.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                    {formatDateBR(log.date)}
                   </span>
                 </div>
                 
@@ -1198,7 +1198,7 @@ export const WorkshopView = ({ logs, machines, employees, plans, alerts, onAddMa
                   required 
                   rows={4} 
                   placeholder="Ex: 1x Mangueira de radiador (Ref. 2341), 5L Aditivo Arrefecimento. Orçamento estimado: R$ 450,00."
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500"
+                  className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500"
                 ></textarea>
               </div>
               <div className="pt-4 flex justify-end gap-2 border-t mt-4">
@@ -1224,15 +1224,15 @@ export const WorkshopView = ({ logs, machines, employees, plans, alerts, onAddMa
             <form className="space-y-4" onSubmit={handleGenerateOS}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Equipamento</label>
-                <input type="text" disabled value={osModal.logData.machineId} className="w-full p-2 border border-gray-300 rounded-md bg-gray-100 dark:bg-[#1e1e1e] text-gray-600 dark:text-gray-300 cursor-not-allowed" />
+                <input type="text" disabled value={osModal.logData.machineId} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-gray-100 dark:bg-[#101010] text-gray-600 dark:text-zinc-400 cursor-not-allowed" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Data Agendada</label>
-                <input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500" />
+                <input name="date" required type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Urgência</label>
-                <select name="urgency" required className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500">
+                <select name="urgency" required className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500">
                   <option value="Alta">Alta</option>
                   <option value="Média">Média</option>
                   <option value="Baixa">Baixa</option>
@@ -1245,7 +1245,7 @@ export const WorkshopView = ({ logs, machines, employees, plans, alerts, onAddMa
                   required 
                   rows={3} 
                   defaultValue={`Origem: Relatório Diário (${osModal.logData.id})\nRelato: ${osModal.logData.observations}`}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500"
+                  className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500"
                 ></textarea>
               </div>
               <div className="pt-4 flex justify-end gap-2 border-t mt-6">
@@ -1373,7 +1373,7 @@ export const ManagementView = ({ machines, maintenances, reports, logs, alerts, 
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
             <Briefcase className="mr-2 text-yellow-600" size={28} />
@@ -1638,7 +1638,8 @@ export const ReportsView = ({ logs, machines, employees }: any) => {
     return logs.filter((log: any) => {
       if (period === 'all') return true;
       
-      const logDate = new Date(log.date + 'T12:00:00'); 
+      const logDate = safeParseDate(log.date);
+      if (!logDate) return false;
       
       if (period === 'daily') {
         return logDate.getDate() === currentDate && logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear;
@@ -1754,7 +1755,7 @@ export const ReportsView = ({ logs, machines, employees }: any) => {
               <select 
                 value={selectedMachine} 
                 onChange={(e) => setSelectedMachine(e.target.value)}
-                className="w-full md:w-auto p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm font-medium bg-white dark:bg-[#151515]"
+                className="w-full md:w-auto p-2 border border-gray-300 dark:border-zinc-700 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm font-medium bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100"
               >
                 <option value="all">Ver Tudo</option>
                 {machines.map((m: any) => (
@@ -1765,7 +1766,7 @@ export const ReportsView = ({ logs, machines, employees }: any) => {
               <select 
                 value={selectedOperator} 
                 onChange={(e) => setSelectedOperator(e.target.value)}
-                className="w-full md:w-auto p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm font-medium bg-white dark:bg-[#151515]"
+                className="w-full md:w-auto p-2 border border-gray-300 dark:border-zinc-700 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm font-medium bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100"
               >
                 <option value="all">Ver Todos</option>
                 {filterableEmployees.map((emp: any) => (
@@ -1779,7 +1780,7 @@ export const ReportsView = ({ logs, machines, employees }: any) => {
               <select 
                 value={period} 
                 onChange={(e) => setPeriod(e.target.value)}
-                className="w-full md:w-auto p-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm font-medium bg-white dark:bg-[#151515]"
+                className="w-full md:w-auto p-2 border border-gray-300 dark:border-zinc-700 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm font-medium bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100"
               >
                 <option value="daily">Diário</option>
                 <option value="weekly">Semana Atual</option>
@@ -1972,8 +1973,8 @@ export const ReportsView = ({ logs, machines, employees }: any) => {
                     const unit = mInfo?.measureUnit || 'h';
                     return (
                     <tr key={log.id} className="hover:bg-gray-50 dark:bg-[#101010]/50">
-                      <td className="p-3 text-sm text-gray-900 dark:text-gray-50 font-medium">
-                        {new Date(log.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      <td className="p-3 text-sm text-gray-900 dark:text-gray-50 font-medium whitespace-nowrap">
+                        {formatDateBR(log.date)}
                       </td>
                       {reportType === 'machines' && <td className="p-3 text-sm text-gray-600 dark:text-gray-300">{getOperatorName(log.operator)}</td>}
                       {reportType === 'operators' && <td className="p-3 text-sm text-gray-600 dark:text-gray-300 font-semibold">{log.machineId}</td>}
@@ -2001,7 +2002,7 @@ export const ReportsView = ({ logs, machines, employees }: any) => {
                   <div key={log.id} className="bg-white dark:bg-[#151515] p-4 rounded-lg border border-gray-200 dark:border-white/10 shadow-sm">
                     <div className="flex justify-between items-start mb-2">
                       <div className="font-medium text-gray-900 dark:text-gray-50">
-                        {new Date(log.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                        {formatDateBR(log.date)}
                       </div>
                       <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold">
                         {log.endHorimeter - log.startHorimeter} {unit}

@@ -62,23 +62,23 @@ export const MaintenancePlansView = ({ templates = [], onAddTemplate, onEditTemp
 
   return (
     <div className="bg-white dark:bg-[#151515] rounded-xl shadow-sm border border-gray-100 dark:border-white/5 overflow-hidden">
-      <div className="p-6 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50 dark:bg-[#101010]">
+      <div className="p-6 border-b border-gray-100 dark:border-white/5 flex flex-col gap-3 bg-gray-50 dark:bg-[#101010]">
         <div>
           <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
             <FileText className="mr-2 text-blue-600" /> Planos de Manutenção Preventiva
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Gerencie os itens de troca obrigatória por modelo e horímetro.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
           <button 
             onClick={onImportInitialTemplates}
-            className="bg-yellow-500 hover:bg-yellow-600 text-yellow-950 font-semibold py-2 px-4 rounded-lg transition-colors text-sm flex items-center"
+            className="bg-yellow-500 hover:bg-yellow-600 text-yellow-950 font-semibold py-2 px-4 rounded-lg transition-colors text-sm flex items-center justify-center"
           >
             <RefreshCw size={16} className="mr-2" /> Sincronizar Planos Padrão
           </button>
           <button 
             onClick={openNew}
-            className="bg-black hover:bg-neutral-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm flex items-center"
+            className="bg-black hover:bg-neutral-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm flex items-center justify-center"
           >
             <Plus size={16} className="mr-2" /> Novo Plano
           </button>
@@ -186,7 +186,7 @@ export const MaintenancePlansView = ({ templates = [], onAddTemplate, onEditTemp
                     type="text" 
                     required
                     placeholder="Ex: PC 210, WA 200, GERAL"
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase"
+                    className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase"
                     value={formData.model}
                     onChange={e => setFormData({...formData, model: e.target.value})}
                   />
@@ -196,7 +196,7 @@ export const MaintenancePlansView = ({ templates = [], onAddTemplate, onEditTemp
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Intervalo Base (Horas)</label>
                   <select 
                     required
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     value={formData.interval}
                     onChange={e => setFormData({...formData, interval: Number(e.target.value)})}
                   >
@@ -215,7 +215,7 @@ export const MaintenancePlansView = ({ templates = [], onAddTemplate, onEditTemp
                   type="text" 
                   required
                   placeholder="Ex: REVISÃO BÁSICA (500h)"
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   value={formData.revision_name}
                   onChange={e => setFormData({...formData, revision_name: e.target.value})}
                 />
@@ -227,7 +227,7 @@ export const MaintenancePlansView = ({ templates = [], onAddTemplate, onEditTemp
                   required
                   rows={8}
                   placeholder="Óleo do motor&#10;Filtro de óleo do motor&#10;Filtro de combustível..."
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                  className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
                   value={formData.items}
                   onChange={e => setFormData({...formData, items: e.target.value})}
                 />
