@@ -3,8 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   ClipboardList, 
-  Truck, 
-  Clock, 
   Gauge, 
   Camera, 
   Trash2, 
@@ -12,9 +10,7 @@ import {
   AlertTriangle, 
   FileText, 
   Fuel, 
-  Info,
   MapPin,
-  Sparkles,
   Loader2,
   Database,
   RefreshCw,
@@ -42,12 +38,12 @@ export function OfflineFormPanel({
   currentUserProfile 
 }: OfflineFormPanelProps) {
   // Navigation tabs for the offline cockpit
-  const [activeTab, setActiveTab] = useState<'checklist' | 'daily' | 'history'>('checklist');
+  const [activeTab, setActiveTab] = useState<'checklist' | 'history'>('checklist');
   const [recentOfflineLogs, setRecentOfflineLogs] = useState<{ checklists: any[]; dailyLogs: any[] }>({
     checklists: [],
     dailyLogs: []
   });
-  const [isRetrying, setIsRetrying] = useState<string | null>(null); // record id currently being retried
+  const [isRetrying, setIsRetrying] = useState<string | null>(null);
 
   // QR Scan flow state
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -56,25 +52,21 @@ export function OfflineFormPanel({
   const startShift = useShiftStore((s) => s.startShift);
   const activeShift = useShiftStore((s) => s.activeShift);
 
-  // Checklist Form React states (only for dynamic elements that require instant render feedbacks)
-  const [checklistMachineId, setChecklistMachineId] = useState('');
-  const [checklistSupervisorId, setChecklistSupervisorId] = useState('');
-  const [defectPhotos, setDefectPhotos] = useState<string[]>([]);
+  // Unified form state
+  const [machineId, setMachineId] = useState('');
+  const [siteId, setSiteId] = useState('');
+  const [operatorId, setOperatorId] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
   const [compressingText, setCompressingText] = useState('');
-  const [checklistSavedSuccess, setChecklistSavedSuccess] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Daily Log state
-  const [dailyMachineId, setDailyMachineId] = useState('');
-  const [dailyPhotos, setDailyPhotos] = useState<string[]>([]);
-  const [dailySavedSuccess, setDailySavedSuccess] = useState(false);
+  // Ref-based performant inputs
+  const horimetroInicialRef = useRef<HTMLInputElement>(null);
+  const horimetroFinalRef = useRef<HTMLInputElement>(null);
+  const fuelAddedRef = useRef<HTMLInputElement>(null);
+  const commentsRef = useRef<HTMLTextAreaElement>(null);
 
-  // Ref-based performant inputs (avoids React re-rendering on keypresses)
-  const checklistOdometerRef = useRef<HTMLInputElement>(null);
-  const checklistEntryHourRef = useRef<HTMLInputElement>(null);
-  const checklistExitHourRef = useRef<HTMLInputElement>(null);
-  const checklistNotesRef = useRef<HTMLTextAreaElement>(null);
-
-  // Verification item answers (using state to allow visual feedback for checkboxes/radios)
+  // Verification item answers
   const [checklistAnswers, setChecklistAnswers] = useState<Record<string, 'bom' | 'reparar' | 'critico'>>({
     motor: 'bom',
     hidraulica: 'bom',
@@ -85,14 +77,6 @@ export function OfflineFormPanel({
     nivel_oleo: 'bom',
     vazamentos: 'bom'
   });
-
-  // Daily Log performant input refs
-  const dailyOdometerStartRef = useRef<HTMLInputElement>(null);
-  const dailyOdometerEndRef = useRef<HTMLInputElement>(null);
-  const dailyFuelAddedRef = useRef<HTMLInputElement>(null);
-  const dailyNotesRef = useRef<HTMLTextAreaElement>(null);
-  const dailySiteRef = useRef<HTMLSelectElement>(null);
-  const dailyOperatorRef = useRef<HTMLSelectElement>(null);
 
   // Setup current values or load previous offline entries on mounting
   useEffect(() => {
@@ -162,13 +146,12 @@ export function OfflineFormPanel({
   };
 
   // Generic fast image uploader with integrated compression logic
-  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>, isChecklist: boolean) => {
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setCompressingText('Compressão em andamento...');
-    const targetPhotos = isChecklist ? defectPhotos : dailyPhotos;
-    const resolvedUrls: string[] = [...targetPhotos];
+    const resolvedUrls: string[] = [...photos];
 
     try {
       for (let i = 0; i < files.length; i++) {
@@ -176,17 +159,11 @@ export function OfflineFormPanel({
           alert("Limite máximo de 4 imagens comprimidas atingido.");
           break;
         }
-        
-        // Execute premium client-side JPEG compression instantly
         const base64Data = await compressImage(files[i], 800, 800, 0.6);
         resolvedUrls.push(base64Data);
       }
 
-      if (isChecklist) {
-        setDefectPhotos(resolvedUrls);
-      } else {
-        setDailyPhotos(resolvedUrls);
-      }
+      setPhotos(resolvedUrls);
     } catch (err) {
       console.error('Image compression failure:', err);
       alert('Não foi possível comprimir esta foto. Tente outra.');
@@ -195,32 +172,32 @@ export function OfflineFormPanel({
     }
   };
 
-  const removePhoto = (idx: number, isChecklist: boolean) => {
-    if (isChecklist) {
-      setDefectPhotos(defectPhotos.filter((_, i) => i !== idx));
-    } else {
-      setDailyPhotos(dailyPhotos.filter((_, i) => i !== idx));
-    }
+  const removePhoto = (idx: number) => {
+    setPhotos(photos.filter((_, i) => i !== idx));
   };
 
-  // High-performance checklist submit handler
-  const handleChecklistSubmit = async (e: React.FormEvent) => {
+  // Unified form submit: saves to both checklists and registrosDiarios
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!checklistMachineId) {
-      alert("Selecione um Ativo de Frota (Máquina).");
+    if (!machineId) {
+      alert("Selecione a máquina.");
       return;
     }
-    if (!checklistSupervisorId) {
-      alert("Selecione o Supervisor Responsável.\n\nEste campo é obrigatório — o checklist precisa de um funcionário válido do quadro (tabela 'funcionarios').");
+    if (!operatorId) {
+      alert("Selecione o Operador de Máquinas.");
       return;
     }
 
-    const entryHour = checklistEntryHourRef.current?.value || '07:00';
-    const exitHour = checklistExitHourRef.current?.value || '17:00';
-    const odometer = parseFloat(checklistOdometerRef.current?.value || '0');
-    const observacoes = checklistNotesRef.current?.value || '';
+    const horimetroInicial = parseFloat(horimetroInicialRef.current?.value || '0');
+    const horimetroFinal = parseFloat(horimetroFinalRef.current?.value || '0');
+    const fuelAdded = parseFloat(fuelAddedRef.current?.value || '0');
+    const observations = commentsRef.current?.value || '';
 
-    // Inspect checklist items to classify severity level
+    if (horimetroFinal < horimetroInicial) {
+      alert("O Horímetro Final não pode ser menor que o Horímetro Inicial.");
+      return;
+    }
+
     const hasCritical = Object.values(checklistAnswers).some(val => val === 'critico');
     const hasRepair = Object.values(checklistAnswers).some(val => val === 'reparar');
     const status: 'aprovado' | 'atencao' | 'critico' = hasCritical 
@@ -229,34 +206,48 @@ export function OfflineFormPanel({
         ? 'atencao' 
         : 'aprovado';
 
-    const localChecklistId = genId();
+    const recordId = genId();
+    const today = new Date().toISOString().split('T')[0];
 
-    const newChecklistObj = {
-      id: localChecklistId,
-      machineId: checklistMachineId,
-      supervisorId: checklistSupervisorId,
-      data: new Date().toISOString().split('T')[0],
-      horaEntrada: entryHour,
-      horaSaida: exitHour,
-      horimetro: odometer,
+    const newChecklist = {
+      id: recordId,
+      machineId: machineId,
+      supervisorId: operatorId,
+      data: today,
+      horaEntrada: '07:00',
+      horaSaida: '17:00',
+      horimetro: horimetroFinal,
       status: status,
       answers: { ...checklistAnswers },
       synced: 0,
-      observacoes: observacoes,
-      defectPhotos: [...defectPhotos]
+      observacoes: observations,
+      defectPhotos: [...photos]
+    };
+
+    const newDailyLog = {
+      id: recordId,
+      operatorId: operatorId,
+      machineId: machineId,
+      siteId: siteId || sites[0] || '',
+      data: today,
+      horimetroInicial: horimetroInicial,
+      horimetroFinal: horimetroFinal,
+      status: 'fechado' as const,
+      fuelAdded: fuelAdded,
+      observations: observations,
+      synced: 0,
+      photos: [...photos]
     };
 
     try {
-      // Direct insertion to Dexie client-side storage
-      await localDb.checklists.add(newChecklistObj);
-      
-      // Update sync count sidebar instantly
+      await localDb.checklists.add(newChecklist);
+      await localDb.registrosDiarios.add(newDailyLog);
       await syncEngine.countPendingRecords();
 
-      // UI confirmation
-      setChecklistSavedSuccess(true);
-      setChecklistMachineId('');
-      setChecklistSupervisorId('');
+      setSavedSuccess(true);
+      setMachineId('');
+      setSiteId('');
+      setOperatorId('');
       setChecklistAnswers({
         motor: 'bom',
         hidraulica: 'bom',
@@ -267,80 +258,17 @@ export function OfflineFormPanel({
         nivel_oleo: 'bom',
         vazamentos: 'bom'
       });
-      setDefectPhotos([]);
-      if (checklistNotesRef.current) checklistNotesRef.current.value = '';
-      if (checklistOdometerRef.current) checklistOdometerRef.current.value = '';
+      setPhotos([]);
+      if (horimetroInicialRef.current) horimetroInicialRef.current.value = '';
+      if (horimetroFinalRef.current) horimetroFinalRef.current.value = '';
+      if (fuelAddedRef.current) fuelAddedRef.current.value = '';
+      if (commentsRef.current) commentsRef.current.value = '';
 
-      setTimeout(() => setChecklistSavedSuccess(false), 5000);
+      setTimeout(() => setSavedSuccess(false), 5000);
       loadRecentLogs();
     } catch (err) {
-      console.error('Error saving checklist offline:', err);
-      alert('Falha ao gravar checklist no IndexedDB local.');
-    }
-  };
-
-  // High-performance daily operational log submission interceptor
-  const handleDailySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!dailyMachineId) {
-      alert("Selecione qual Máquina operou hoje.");
-      return;
-    }
-
-    const siteId = dailySiteRef.current?.value || 'Codelmaq Matriz';
-    const operatorId = dailyOperatorRef.current?.value;
-    if (!operatorId) {
-      alert("Selecione o Operador de Máquinas.\n\nEste campo é obrigatório — o parte diária precisa de um funcionário válido do quadro (tabela 'funcionarios').");
-      return;
-    }
-    const horimetroInicial = parseFloat(dailyOdometerStartRef.current?.value || '0');
-    const horimetroFinal = parseFloat(dailyOdometerEndRef.current?.value || '0');
-    const fuelAdded = parseFloat(dailyFuelAddedRef.current?.value || '0');
-    const observations = dailyNotesRef.current?.value || '';
-
-    if (horimetroFinal < horimetroInicial) {
-      alert("O Horímetro Final não pode ser menor que o Horímetro Inicial.");
-      return;
-    }
-
-    const uniqueDailyId = genId();
-
-    const newDailyLog = {
-      id: uniqueDailyId,
-      operatorId: operatorId,
-      machineId: dailyMachineId,
-      siteId: siteId,
-      data: new Date().toISOString().split('T')[0],
-      horimetroInicial: horimetroInicial,
-      horimetroFinal: horimetroFinal,
-      status: 'fechado' as const,
-      fuelAdded: fuelAdded,
-      observations: observations,
-      synced: 0,
-      photos: [...dailyPhotos]
-    };
-
-    try {
-      // Direct insertion to local Dexie engine without fetch
-      await localDb.registrosDiarios.add(newDailyLog);
-      
-      // Update synchronization pending statistics
-      await syncEngine.countPendingRecords();
-
-      setDailySavedSuccess(true);
-      setDailyMachineId('');
-      setDailyPhotos([]);
-      
-      if (dailyOdometerStartRef.current) dailyOdometerStartRef.current.value = '';
-      if (dailyOdometerEndRef.current) dailyOdometerEndRef.current.value = '';
-      if (dailyFuelAddedRef.current) dailyFuelAddedRef.current.value = '0';
-      if (dailyNotesRef.current) dailyNotesRef.current.value = '';
-
-      setTimeout(() => setDailySavedSuccess(false), 5000);
-      loadRecentLogs();
-    } catch (err) {
-      console.error('Falha ao registrar parte diária localmente:', err);
-      alert('Erro ao gravar Parte Diária no IndexedDB local.');
+      console.error('Falha ao salvar registro:', err);
+      alert('Erro ao gravar no IndexedDB local.');
     }
   };
 
@@ -415,9 +343,8 @@ export function OfflineFormPanel({
         siteId: newDailyLog.siteId,
       });
 
-      // Pre-select the machine in the form (so subsequent checklist/daily fills use the same ativo)
-      setChecklistMachineId(data.machineId);
-      setDailyMachineId(data.machineId);
+      // Pre-select the machine in the form
+      setMachineId(data.machineId);
 
       setScannedCode(null);
     } catch (e) {
@@ -437,7 +364,7 @@ export function OfflineFormPanel({
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       
-      {/* Cockpit Header with Premium design badges */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 bg-white dark:bg-[#101010]/30 border border-[#7c4ff0]/20 dark:border-[#a17af0]/15 shadow-sm rounded-2xl">
         <div className="min-w-0">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white font-heading tracking-tight flex items-center gap-2">
@@ -445,7 +372,7 @@ export function OfflineFormPanel({
             PAINEL OPERACIONAL OFFLINE-FIRST
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Grave check-lists e partes diárias seguros mesmo sem sinal de rede. Transmita quando houver internet.
+            Registro diário completo com vistoria — tudo offline.
           </p>
         </div>
 
@@ -467,15 +394,6 @@ export function OfflineFormPanel({
             <ClipboardList size={13} />
             Checklist Diário
           </button>
-          
-          <button 
-            type="button" 
-            onClick={() => setActiveTab('daily')}
-            className={`px-3 py-1.5 rounded-lg font-bold font-heading uppercase transition-all flex items-center gap-1 cursor-pointer ${activeTab === 'daily' ? 'bg-[#ca8a04] dark:bg-[#eab308] text-white shadow-md shadow-yellow-500/20 font-bold' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'}`}
-          >
-            <FileText size={13} />
-            Parte Diária
-          </button>
 
           <button 
             type="button" 
@@ -488,7 +406,7 @@ export function OfflineFormPanel({
         </div>
       </div>
 
-      {/* COMPRESSING INDICATOR SPINNER */}
+      {/* COMPRESSING INDICATOR */}
       {compressingText && (
         <div className="p-3 bg-yellow-500/15 border border-yellow-500/20 text-yellow-300 rounded-xl text-center text-xs flex items-center justify-center gap-2 animate-pulse">
           <Camera className="animate-bounce" size={14} />
@@ -496,27 +414,27 @@ export function OfflineFormPanel({
         </div>
       )}
 
-      {/* TAB A: CHECKLIST DIÁRIO */}
+      {/* UNIFIED FORM */}
       {activeTab === 'checklist' && (
-        <form onSubmit={handleChecklistSubmit} className="space-y-4 bg-white dark:bg-[#151515]/5 border border-white/10 rounded-2xl p-5 md:p-6 backdrop-blur-md">
-          {checklistSavedSuccess && (
+        <form onSubmit={handleSubmit} className="space-y-4 bg-white dark:bg-[#151515]/5 border border-white/10 rounded-2xl p-5 md:p-6 backdrop-blur-md">
+          {savedSuccess && (
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs flex items-center gap-2">
               <CheckCircle size={16} />
-              <span><strong>Checklist salvo!</strong> Gravado com sucesso no IndexedDB local. O indicador de sincronismo no menu foi atualizado.</span>
+              <span><strong>Registro salvo!</strong> Checklist + Parte Diária gravados com sucesso no IndexedDB local. Sincronização automática quando houver internet.</span>
             </div>
           )}
 
+          {/* Linha 1: Ativo + Obra + Operador */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Machine Selector */}
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Ativo da Frota (Veículo)</label>
+              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Ativo da Frota</label>
               <select
                 required
-                value={checklistMachineId}
-                onChange={(e) => setChecklistMachineId(e.target.value)}
+                value={machineId}
+                onChange={(e) => setMachineId(e.target.value)}
                 className="bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
               >
-                <option value="">Selecione o equipamento...</option>
+                <option value="">Selecione a máquina...</option>
                 {machines.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.id} - {m.name} ({m.type})
@@ -525,16 +443,33 @@ export function OfflineFormPanel({
               </select>
             </div>
 
-            {/* Supervisor Selector — uses funcionarios.id (NOT auth.users.id, different table) */}
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Supervisor Responsável</label>
+              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Obra de Operação</label>
+              <select
+                value={siteId}
+                onChange={(e) => setSiteId(e.target.value)}
+                className="bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
+              >
+                {sites.map((st: any, idx: number) => (
+                  <option key={st.id || idx} value={st.nome || st.name || st}>
+                    {st.nome || st.name || st}
+                  </option>
+                ))}
+                {sites.length === 0 && (
+                  <option value="Codelmaq Matriz">Codelmaq Matriz</option>
+                )}
+              </select>
+            </div>
+
+            <div className="flex flex-col space-y-1.5">
+              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Operador de Máquinas</label>
               <select
                 required
-                value={checklistSupervisorId}
-                onChange={(e) => setChecklistSupervisorId(e.target.value)}
-                className="bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
+                value={operatorId}
+                onChange={(e) => setOperatorId(e.target.value)}
+                className="bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
               >
-                <option value="">Selecione o supervisor...</option>
+                <option value="">Selecione o operador...</option>
                 {employees.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.nome} ({e.role || e.funcao || 'colaborador'})
@@ -542,65 +477,63 @@ export function OfflineFormPanel({
                 ))}
               </select>
             </div>
-
-            {/* Entrance Hour */}
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Horário entrada (Início Turno)</label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
-                <input
-                  type="time"
-                  defaultValue="07:00"
-                  ref={checklistEntryHourRef}
-                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Exit Hour */}
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Horário Saída (Fechamento)</label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
-                <input
-                  type="time"
-                  defaultValue="17:00"
-                  ref={checklistExitHourRef}
-                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
-                />
-              </div>
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
-            {/* Initial vehicle km or machine meter */}
+          {/* Linha 2: Hor.Inicial + Hor.Final + Abastecimento + Data */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-800 dark:text-gray-400 uppercase font-bold tracking-wider">Horômetro / Odrômetro (KM atual)</label>
+              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Horômetro / KM Inicial</label>
               <div className="relative">
                 <Gauge className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
                 <input
                   type="number"
-                  ref={checklistOdometerRef}
                   required
+                  ref={horimetroInicialRef}
                   placeholder="Ex: 1450"
-                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
+                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
                 />
               </div>
             </div>
 
-            {/* Supervisor reference */}
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-800 dark:text-gray-400 uppercase font-bold tracking-wider">Responsável Técnico</label>
+              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Horômetro / KM Final</label>
+              <div className="relative">
+                <Gauge className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
+                <input
+                  type="number"
+                  required
+                  ref={horimetroFinalRef}
+                  placeholder="Ex: 1462"
+                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col space-y-1.5">
+              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Abastecimento (Litros)</label>
+              <div className="relative">
+                <Fuel className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
+                <input
+                  type="number"
+                  ref={fuelAddedRef}
+                  placeholder="0"
+                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col space-y-1.5">
+              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Data do Diário</label>
               <input
                 type="text"
                 disabled
-                className="bg-gray-100 dark:bg-[#151515]/5 border border-gray-300 dark:border-white/5 rounded-xl p-2.5 text-xs text-gray-600 dark:text-gray-300 font-semibold"
-                value={currentUserProfile?.nome || 'Operador Conectado'}
+                className="bg-gray-100 dark:bg-[#151515]/5 border border-gray-200 dark:border-white/5 rounded-xl p-2.5 text-xs text-gray-500 dark:text-gray-400 font-semibold"
+                value={new Date().toLocaleDateString('pt-BR')}
               />
             </div>
           </div>
 
-          {/* CHECKLIST ITEMS ROW */}
+          {/* ITENS DE VISTORIA */}
           <div className="pt-4 border-t border-white/5 space-y-3">
             <span className="text-[11px] font-bold uppercase tracking-wider text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
               <ClipboardList size={14} />
@@ -654,201 +587,7 @@ export function OfflineFormPanel({
             </div>
           </div>
 
-          {/* DEFECT PHOTO COMPONENT WITH HIGH COMPRESSION COMPLIANCE */}
-          <div className="pt-4 border-t border-white/5 space-y-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-yellow-400 flex items-center gap-1">
-              <Camera size={14} />
-              COLEÇÃO DE FOTOS DE AVARIAS OU CONSERVAÇÃO
-            </span>
-
-            <div className="flex flex-wrap gap-3 items-center">
-              {/* Photo Input Trigger */}
-              <label className="w-24 h-24 bg-[#101010] hover:bg-neutral-900 border-2 border-dashed border-white/15 rounded-xl flex flex-col items-center justify-center cursor-pointer text-gray-500 dark:text-gray-400 transition-colors group">
-                <Camera size={20} className="group-hover:text-[#eab308] transition-colors" />
-                <span className="text-[9px] text-gray-400 mt-1 font-semibold text-center leading-tight">Anexar<br/>Fotos</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => handlePhotoCapture(e, true)}
-                  className="hidden"
-                />
-              </label>
-
-              {/* Compressed Image Thumbnails with Base64 reference */}
-              {defectPhotos.map((dataUri, idx) => (
-                <div key={idx} className="relative w-24 h-24 rounded-xl overflow-hidden border border-white/10 group bg-black">
-                  <img src={dataUri} alt="defect preview" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(idx, true)}
-                      className="p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors cursor-pointer"
-                      title="Excluir imagem comprimida"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                  <span className="absolute bottom-1 right-1 bg-black/70 text-[8px] font-mono text-emerald-400 px-1 rounded">
-                    JPEG Compr.
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="text-[9px] text-gray-500 dark:text-gray-400 leading-none">Imagens são redimensionadas para max 800px no browser eliminando estouros de pilha.</p>
-          </div>
-
-          {/* Observations notes field */}
-          <div className="flex flex-col space-y-1.5 pt-2">
-            <label className="text-[10px] text-gray-800 dark:text-gray-400 uppercase font-bold tracking-wider">Notas Técnicas Extra</label>
-            <textarea
-              ref={checklistNotesRef}
-              rows={2}
-              placeholder="Descreva problemas observados ou observações de campo de forma livre..."
-              className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
-            />
-          </div>
-
-          {/* Form Actions */}
-          <div className="pt-2 flex justify-end">
-            <button
-              type="submit"
-              className="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-yellow-950 font-bold font-heading rounded-xl cursor-pointer text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-lg shadow-yellow-500/10"
-            >
-              <CheckCircle size={14} />
-              Gravar Checklist em Cache Seguro
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* TAB B: PARTE DIÁRIA */}
-      {activeTab === 'daily' && (
-        <form onSubmit={handleDailySubmit} className="space-y-4 bg-white dark:bg-[#151515]/5 border border-white/10 rounded-2xl p-5 md:p-6 backdrop-blur-md font-sans">
-          {dailySavedSuccess && (
-            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs flex items-center gap-2">
-              <CheckCircle size={16} />
-              <span><strong>Parte Diária gravada!</strong> Registrado com sucesso offline. Quando internet retornar use o painel central de sincronização.</span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Machine */}
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-800 dark:text-gray-400 uppercase font-bold tracking-wider">Ativo da Frota</label>
-              <select
-                required
-                value={dailyMachineId}
-                onChange={(e) => setDailyMachineId(e.target.value)}
-                className="bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
-              >
-                <option value="">Selecione a máquina...</option>
-                {machines.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.id} - {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Site / Obra */}
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-800 dark:text-gray-400 uppercase font-bold tracking-wider">Obra de Operação</label>
-              <select
-                ref={dailySiteRef}
-                className="bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
-              >
-                {sites.map((st: any, idx: number) => (
-                  <option key={st.id || idx} value={st.nome || st.name || st}>
-                    {st.nome || st.name || st}
-                  </option>
-                ))}
-                {sites.length === 0 && (
-                  <option value="Codelmaq Matriz">Codelmaq Matriz</option>
-                )}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-            {/* Operator Selection — uses funcionarios.id (NOT auth.users.id) */}
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-800 dark:text-gray-400 uppercase font-bold tracking-wider">Operador de Máquinas</label>
-              <select
-                ref={dailyOperatorRef}
-                required
-                defaultValue=""
-                className="bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
-              >
-                <option value="">Selecione o operador...</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nome} ({e.role})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Odometer Start value */}
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Horômetro / KM Inicial</label>
-              <div className="relative">
-                <Gauge className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
-                <input
-                  type="number"
-                  required
-                  ref={dailyOdometerStartRef}
-                  placeholder="Ex: 1450"
-                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Odometer End value */}
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Horômetro / KM Final</label>
-              <div className="relative">
-                <Gauge className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
-                <input
-                  type="number"
-                  required
-                  ref={dailyOdometerEndRef}
-                  placeholder="Ex: 1462"
-                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            {/* Combustível Abastecido Added */}
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Abastecimento Realizado (Litros)</label>
-              <div className="relative">
-                <Fuel className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
-                <input
-                  type="number"
-                  ref={dailyFuelAddedRef}
-                  defaultValue="0"
-                  placeholder="Abastecido no tanque"
-                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Date validation */}
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Data do Diário</label>
-              <input
-                type="text"
-                disabled
-                className="bg-gray-100 dark:bg-[#151515]/5 border border-gray-200 dark:border-white/5 rounded-xl p-2.5 text-xs text-gray-500 dark:text-gray-400 font-semibold"
-                value={new Date().toLocaleDateString('pt-BR')}
-              />
-            </div>
-          </div>
-
-          {/* Defect photo Capture Area inside Daily Form */}
+          {/* FOTOS */}
           <div className="pt-4 border-t border-white/5 space-y-3">
             <span className="text-[11px] font-bold uppercase tracking-wider text-yellow-400 flex items-center gap-1">
               <Camera size={14} />
@@ -863,18 +602,18 @@ export function OfflineFormPanel({
                   type="file"
                   accept="image/*"
                   multiple
-                  onChange={(e) => handlePhotoCapture(e, false)}
+                  onChange={handlePhotoCapture}
                   className="hidden"
                 />
               </label>
 
-              {dailyPhotos.map((dataUri, idx) => (
+              {photos.map((dataUri, idx) => (
                 <div key={idx} className="relative w-24 h-24 rounded-xl overflow-hidden border border-white/10 group bg-black">
-                  <img src={dataUri} alt="daily operation preview" className="w-full h-full object-cover" />
+                  <img src={dataUri} alt="preview" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <button
                       type="button"
-                      onClick={() => removePhoto(idx, false)}
+                      onClick={() => removePhoto(idx)}
                       className="p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors cursor-pointer"
                     >
                       <Trash2 size={13} />
@@ -888,18 +627,18 @@ export function OfflineFormPanel({
             </div>
           </div>
 
-          {/* Observations notes field */}
+          {/* Comentários */}
           <div className="flex flex-col space-y-1.5 pt-2">
             <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Comentários e Intercorrências</label>
             <textarea
-              ref={dailyNotesRef}
+              ref={commentsRef}
               rows={2}
               placeholder="Houve intercorrências, quebras, chuvas paralisantes ou abastecimento extra? Descreva..."
               className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
             />
           </div>
 
-          {/* Form Actions */}
+          {/* Submit */}
           <div className="pt-2 flex justify-end">
             <button
               type="submit"
