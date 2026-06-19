@@ -1,18 +1,48 @@
 "use client";
-import React, { useState, useMemo, useCallback } from 'react';
-import { 
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import {
   CheckCircle, Clock, X, Cog, PackageSearch, FileText,
   Truck, AlertOctagon, AlertTriangle, CheckCircle2, Wrench,
   Briefcase, PieChart, BarChart3, CalendarDays, ClipboardList,
   Users, Fuel, Camera, Printer, Droplets, Plus, History, ArrowDownCircle, ArrowUpCircle,
-  Settings, Edit2, Trash2, Trophy, Star, TrendingUp, Award, User, Download
+  Settings, Edit2, Trash2, Trophy, Star, TrendingUp, Award, User, Download,
+  ImageIcon, Lock
 } from 'lucide-react';
 import { MAINTENANCE_DB, defaultChecklistItems } from '@/lib/data';
 import { generateFuelTruckPDF, generatePerformancePDF, generateFieldMetricsPDF } from '@/lib/pdfUtils';
 import { genId, formatDateBR, safeTimeOf, safeParseDate } from '@/lib/utils';
+import { localDb, LocalPenalty } from '@/lib/localDb';
+import { PenaltyModal } from './PenaltyModal';
 
-export const PerformanceView = ({ scoringRules, pointsHistory, monthlyRanking, employees, userProfile, logs }: any) => {
+export const PerformanceView = ({
+  scoringRules,
+  pointsHistory,
+  monthlyRanking,
+  employees,
+  userProfile,
+  logs,
+  isAdmin = false,
+}: any) => {
   const [activeTab, setActiveTab] = useState('ranking');
+  const [penalties, setPenalties] = useState<LocalPenalty[]>([]);
+  const [penaltyModalOpen, setPenaltyModalOpen] = useState(false);
+
+  // Reload penalties from local DB
+  const reloadPenalties = useCallback(async () => {
+    try {
+      const list = await localDb.penalties.toArray();
+      setPenalties(list.sort((a, b) => (b.dataEvento || '').localeCompare(a.dataEvento || '')));
+    } catch (e) {
+      console.error('Erro ao carregar penalidades:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      reloadPenalties();
+    }, 0);
+    return () => clearTimeout(id);
+  }, [reloadPenalties]);
 
   // Determine active operator's name
   const userNome = userProfile?.nome || "João Silva";
@@ -93,86 +123,99 @@ export const PerformanceView = ({ scoringRules, pointsHistory, monthlyRanking, e
             Profissional ativo: <strong className="text-[#eab308] font-semibold">{userNome}</strong> ({userProfile?.role || 'Colaborador'})
           </p>
         </div>
-        <div className="flex gap-2">
-          <button 
-            type="button"
-            onClick={() => generatePerformancePDF(sortedRanking, sortedHistory)}
-            className="bg-red-50 hover:bg-red-100 text-red-700 font-semibold py-2 px-4 rounded-lg flex items-center transition-colors border border-red-200 cursor-pointer"
-            title="Baixar relatório em PDF"
-          >
-            <Download size={18} className="mr-2" />
-            Exportar PDF
-          </button>
+        <div className="flex gap-2 flex-wrap">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setPenaltyModalOpen(true)}
+              className="bg-red-50 hover:bg-red-100 text-red-700 font-semibold py-2 px-4 rounded-lg flex items-center transition-colors border border-red-200 cursor-pointer"
+              title="Aplicar penalidade a um operador (debita pontos)"
+            >
+              <AlertOctagon size={18} className="mr-2" />
+              Aplicar Penalidade
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => generatePerformancePDF(sortedRanking, sortedHistory)}
+              className="bg-red-50 hover:bg-red-100 text-red-700 font-semibold py-2 px-4 rounded-lg flex items-center transition-colors border border-red-200 cursor-pointer"
+              title="Baixar relatório em PDF (apenas admin)"
+            >
+              <Download size={18} className="mr-2" />
+              Exportar PDF
+            </button>
+          )}
         </div>
       </div>
 
       {/* Bento Grid — Resumo Operacional de Desempenho */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Pontuação */}
-        <div className="bg-gradient-to-br from-amber-100 to-yellow-50 border border-amber-300/60 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-gradient-to-br from-amber-100 to-yellow-50 border-2 border-amber-400 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div className="absolute right-3 top-3 opacity-25 text-amber-600">
             <Trophy size={40} />
           </div>
           <div>
-            <p className="text-xs font-bold text-amber-900 uppercase tracking-wider">Pontuação Geral</p>
-            <h4 className="text-3xl font-black text-amber-900 mt-1">{personalPointsValue} <span className="text-xs font-bold text-amber-800/80">pts</span></h4>
+            <p className="text-xs font-black text-amber-900 uppercase tracking-wider">Pontuação Geral</p>
+            <h4 className="text-3xl font-black text-amber-950 mt-1">{personalPointsValue} <span className="text-xs font-bold text-amber-800">pts</span></h4>
           </div>
-          <div className="mt-4 pt-3 border-t border-amber-300/60 flex justify-between items-center text-xs">
-            <span className="text-amber-900/80 font-semibold">Nível sugerido:</span>
-            <span className="font-extrabold uppercase text-amber-900 bg-amber-300/60 px-2 py-0.5 rounded-md">
+          <div className="mt-4 pt-3 border-t-2 border-amber-300 flex justify-between items-center text-xs">
+            <span className="text-amber-900 font-bold">Nível sugerido:</span>
+            <span className="font-extrabold uppercase text-amber-950 bg-amber-300 px-2 py-0.5 rounded-md">
               {personalPointsValue >= 900 ? '🥇 Ouro' : personalPointsValue >= 700 ? '🥈 Prata' : '🥉 Bronze'}
             </span>
           </div>
         </div>
 
         {/* Card 2: Ranking Position */}
-        <div className="bg-white dark:bg-[#151515] border border-gray-200 dark:border-white/10 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-white dark:bg-[#151515] border-2 border-gray-300 dark:border-white/10 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div className="absolute right-3 top-3 opacity-10 text-yellow-500">
             <Award size={40} />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Posição no Ranking</p>
-            <h4 className="text-3xl font-black text-gray-800 dark:text-gray-100 mt-1">
+            <p className="text-xs font-black text-gray-700 dark:text-gray-300 uppercase tracking-wider">Posição no Ranking</p>
+            <h4 className="text-3xl font-black text-gray-900 dark:text-gray-100 mt-1">
               {userRankPosition ? `#${userRankPosition}º` : 'Sem rank'}
             </h4>
           </div>
-          <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex justify-between items-center text-xs">
-            <span className="text-gray-500 dark:text-gray-400 font-medium">Situação de Posição:</span>
-            <span className={`font-bold ${userRankData?.posicao_anterior > userRankPosition ? 'text-green-600' : 'text-gray-500 dark:text-gray-400'}`}>
+          <div className="mt-4 pt-3 border-t-2 border-gray-200 dark:border-white/5 flex justify-between items-center text-xs">
+            <span className="text-gray-700 dark:text-gray-300 font-bold">Situação de Posição:</span>
+            <span className={`font-black ${userRankData?.posicao_anterior > userRankPosition ? 'text-green-700' : 'text-gray-700 dark:text-gray-300'}`}>
               {userRankData?.posicao_anterior > userRankPosition ? '📈 Subindo' : 'Stable'}
             </span>
           </div>
         </div>
 
         {/* Card 3: Checklists Realizados */}
-        <div className="bg-white dark:bg-[#151515] border border-gray-200 dark:border-white/10 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-white dark:bg-[#151515] border-2 border-gray-300 dark:border-white/10 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div className="absolute right-3 top-3 opacity-10 text-emerald-500">
             <CheckCircle2 size={40} />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Checklists / Turnos</p>
-            <h4 className="text-3xl font-black text-gray-800 dark:text-gray-100 mt-1">{userStats.totalChecklists} <span className="text-xs font-bold text-gray-500 dark:text-gray-400">enviados</span></h4>
+            <p className="text-xs font-black text-gray-700 dark:text-gray-300 uppercase tracking-wider">Checklists / Turnos</p>
+            <h4 className="text-3xl font-black text-gray-900 dark:text-gray-100 mt-1">{userStats.totalChecklists} <span className="text-xs font-bold text-gray-700 dark:text-gray-300">enviados</span></h4>
           </div>
-          <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex justify-between items-center text-xs">
-            <span className="text-gray-500 dark:text-gray-400 font-medium">Avarias relatadas:</span>
-            <span className={`font-bold ${userStats.avariasCount > 0 ? 'text-amber-600' : 'text-gray-600 dark:text-gray-300'}`}>
+          <div className="mt-4 pt-3 border-t-2 border-gray-200 dark:border-white/5 flex justify-between items-center text-xs">
+            <span className="text-gray-700 dark:text-gray-300 font-bold">Avarias relatadas:</span>
+            <span className={`font-black ${userStats.avariasCount > 0 ? 'text-amber-700' : 'text-gray-700 dark:text-gray-300'}`}>
               ⚠️ {userStats.avariasCount}
             </span>
           </div>
         </div>
 
         {/* Card 4: Horômetro em campo */}
-        <div className="bg-white dark:bg-[#151515] border border-gray-200 dark:border-white/10 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-white dark:bg-[#151515] border-2 border-gray-300 dark:border-white/10 rounded-xl p-5 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div className="absolute right-3 top-3 opacity-10 text-blue-500">
             <Clock size={40} />
           </div>
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tempo de Plantão</p>
-            <h4 className="text-3xl font-black text-gray-800 dark:text-gray-100 mt-1">{userStats.totalHours.toFixed(1)} <span className="text-xs font-bold text-gray-500 dark:text-gray-400">horas</span></h4>
+            <p className="text-xs font-black text-gray-700 dark:text-gray-300 uppercase tracking-wider">Tempo de Plantão</p>
+            <h4 className="text-3xl font-black text-gray-900 dark:text-gray-100 mt-1">{userStats.totalHours.toFixed(1)} <span className="text-xs font-bold text-gray-700 dark:text-gray-300">horas</span></h4>
           </div>
-          <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex justify-between items-center text-xs">
-            <span className="text-gray-500 dark:text-gray-400 font-medium">Horas médias úteis:</span>
-            <span className="font-bold text-gray-700 dark:text-gray-200">{userStats.avgHours}h / turno</span>
+          <div className="mt-4 pt-3 border-t-2 border-gray-200 dark:border-white/5 flex justify-between items-center text-xs">
+            <span className="text-gray-700 dark:text-gray-300 font-bold">Horas médias úteis:</span>
+            <span className="font-black text-gray-900 dark:text-gray-100">{userStats.avgHours}h / turno</span>
           </div>
         </div>
       </div>
@@ -196,11 +239,18 @@ export const PerformanceView = ({ scoringRules, pointsHistory, monthlyRanking, e
         >
           Regras de Pontuação
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('help')}
           className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 ${activeTab === 'help' ? 'border-[#eab308] text-[#eab308]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
         >
           Regras e Ajuda
+        </button>
+        <button
+          onClick={() => setActiveTab('penalties')}
+          className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 flex items-center gap-1.5 ${activeTab === 'penalties' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
+        >
+          <AlertOctagon size={14} />
+          {isAdmin ? 'Penalidades Aplicadas' : 'Minhas Penalidades'}
         </button>
       </div>
 
@@ -320,61 +370,61 @@ export const PerformanceView = ({ scoringRules, pointsHistory, monthlyRanking, e
               <Trophy className="mr-3 text-yellow-500" size={36} />
               Programa de Excelência CODELMAQ
             </h3>
-            <p className="text-xl font-bold text-blue-600 italic">&quot;Quem cuida, ganha!&quot;</p>
-            <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+            <p className="text-xl font-bold text-blue-700 dark:text-blue-400 italic">&quot;Quem cuida, ganha!&quot;</p>
+            <p className="text-gray-800 dark:text-gray-100 leading-relaxed font-medium">
               Bem-vindo ao seu painel de desempenho! Este programa foi criado para reconhecer os melhores profissionais da nossa frota. Aqui, cada ação sua no dia a dia conta pontos para prêmios e bônus mensais.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
-              <h4 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center border-b pb-2">
-                <ClipboardList className="mr-2 text-green-600" size={20} />
+              <h4 className="text-lg font-bold text-gray-900 dark:text-gray-50 flex items-center border-b-2 border-green-300 pb-2">
+                <ClipboardList className="mr-2 text-green-700" size={20} />
                 📝 Como acumular pontos?
               </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400">É simples: basta fazer o que você já faz de melhor, com atenção aos detalhes!</p>
+              <p className="text-sm text-gray-800 dark:text-gray-200 font-medium">É simples: basta fazer o que você já faz de melhor, com atenção aos detalhes!</p>
               <ul className="space-y-3">
-                <li className="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-100">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Checklist em dia</span>
-                  <span className="font-bold text-green-600">+10 pts/dia</span>
+                <li className="flex justify-between items-center p-3.5 bg-green-100 rounded-lg border-2 border-green-300 shadow-sm">
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-50">Checklist em dia</span>
+                  <span className="font-black text-green-800 text-base">+10 pts/dia</span>
                 </li>
-                <li className="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-100">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Máquina/Caminhão Limpo</span>
-                  <span className="font-bold text-green-600">+50 pts/semana</span>
+                <li className="flex justify-between items-center p-3.5 bg-green-100 rounded-lg border-2 border-green-300 shadow-sm">
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-50">Máquina/Caminhão Limpo</span>
+                  <span className="font-black text-green-800 text-base">+50 pts/semana</span>
                 </li>
-                <li className="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-100">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Direção Segura</span>
-                  <span className="font-bold text-green-600">+200 pts/mês</span>
+                <li className="flex justify-between items-center p-3.5 bg-green-100 rounded-lg border-2 border-green-300 shadow-sm">
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-50">Direção Segura</span>
+                  <span className="font-black text-green-800 text-base">+200 pts/mês</span>
                 </li>
-                <li className="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-100">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Economia de Combustível</span>
-                  <span className="font-bold text-green-600">+150 pts/mês</span>
+                <li className="flex justify-between items-center p-3.5 bg-green-100 rounded-lg border-2 border-green-300 shadow-sm">
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-50">Economia de Combustível</span>
+                  <span className="font-black text-green-800 text-base">+150 pts/mês</span>
                 </li>
-                <li className="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-100">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Olho de Águia</span>
-                  <span className="font-bold text-green-600">+100 pts</span>
+                <li className="flex justify-between items-center p-3.5 bg-green-100 rounded-lg border-2 border-green-300 shadow-sm">
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-50">Olho de Águia</span>
+                  <span className="font-black text-green-800 text-base">+100 pts</span>
                 </li>
               </ul>
             </div>
 
             <div className="space-y-4">
-              <h4 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center border-b pb-2">
-                <AlertTriangle className="mr-2 text-red-600" size={20} />
+              <h4 className="text-lg font-bold text-gray-900 dark:text-gray-50 flex items-center border-b-2 border-red-300 pb-2">
+                <AlertTriangle className="mr-2 text-red-700" size={20} />
                 ⚠️ Fique atento às penalidades
               </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Para mantermos a segurança de todos, alguns pontos podem ser retirados:</p>
+              <p className="text-sm text-gray-800 dark:text-gray-200 font-medium">Para mantermos a segurança de todos, alguns pontos podem ser retirados:</p>
               <ul className="space-y-3">
-                <li className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Deixar de fazer o Daily Check</span>
-                  <span className="font-bold text-red-600">-50 pts</span>
+                <li className="flex justify-between items-center p-3.5 bg-red-100 rounded-lg border-2 border-red-300 shadow-sm">
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-50">Deixar de fazer o Daily Check</span>
+                  <span className="font-black text-red-800 text-base">-50 pts</span>
                 </li>
-                <li className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Multas ou avarias por descuido</span>
-                  <span className="font-bold text-red-600">-300 a -500 pts</span>
+                <li className="flex justify-between items-center p-3.5 bg-red-100 rounded-lg border-2 border-red-300 shadow-sm">
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-50">Multas ou avarias por descuido</span>
+                  <span className="font-black text-red-800 text-base">-300 a -500 pts</span>
                 </li>
-                <li className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Motor ocioso sem necessidade</span>
-                  <span className="font-bold text-red-600">-20 pts</span>
+                <li className="flex justify-between items-center p-3.5 bg-red-100 rounded-lg border-2 border-red-300 shadow-sm">
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-50">Motor ocioso sem necessidade</span>
+                  <span className="font-black text-red-800 text-base">-20 pts</span>
                 </li>
               </ul>
             </div>
@@ -386,37 +436,158 @@ export const PerformanceView = ({ scoringRules, pointsHistory, monthlyRanking, e
               🎁 Níveis e Premiações
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
-                <div className="font-black text-yellow-700 text-lg mb-1">OURO</div>
-                <div className="text-xs text-yellow-600 font-bold mb-2">Acima de 900 pts</div>
-                <p className="text-xs text-gray-700 dark:text-gray-200">Bônus máximo no cartão + Certificado de Operador Elite.</p>
+              <div className="p-5 bg-gradient-to-br from-yellow-100 to-yellow-200 border-2 border-yellow-400 rounded-xl text-center shadow-sm">
+                <div className="text-3xl mb-1">🥇</div>
+                <div className="font-black text-yellow-900 text-lg mb-1 uppercase tracking-wider">OURO</div>
+                <div className="text-xs text-yellow-900 font-black mb-2">Acima de 900 pts</div>
+                <p className="text-xs text-gray-900 dark:text-gray-900 font-bold">Bônus máximo no cartão + Certificado de Operador Elite.</p>
               </div>
-              <div className="p-4 bg-gray-50 dark:bg-[#101010] border border-gray-200 dark:border-white/10 rounded-xl text-center">
-                <div className="font-black text-gray-700 dark:text-gray-200 text-lg mb-1">PRATA</div>
-                <div className="text-xs text-gray-600 dark:text-gray-300 font-bold mb-2">700 a 899 pts</div>
-                <p className="text-xs text-gray-700 dark:text-gray-200">Bônus intermediário no cartão + Kit Codelmaq.</p>
+              <div className="p-5 bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-400 rounded-xl text-center shadow-sm">
+                <div className="text-3xl mb-1">🥈</div>
+                <div className="font-black text-gray-900 text-lg mb-1 uppercase tracking-wider">PRATA</div>
+                <div className="text-xs text-gray-900 font-black mb-2">700 a 899 pts</div>
+                <p className="text-xs text-gray-900 font-bold">Bônus intermediário no cartão + Kit Codelmaq.</p>
               </div>
-              <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl text-center">
-                <div className="font-black text-orange-700 text-lg mb-1">BRONZE</div>
-                <div className="text-xs text-orange-600 font-bold mb-2">500 a 699 pts</div>
-                <p className="text-xs text-gray-700 dark:text-gray-200">Reconhecimento no mural e participação em sorteios.</p>
+              <div className="p-5 bg-gradient-to-br from-orange-100 to-orange-200 border-2 border-orange-400 rounded-xl text-center shadow-sm">
+                <div className="text-3xl mb-1">🥉</div>
+                <div className="font-black text-orange-900 text-lg mb-1 uppercase tracking-wider">BRONZE</div>
+                <div className="text-xs text-orange-900 font-black mb-2">500 a 699 pts</div>
+                <p className="text-xs text-gray-900 font-bold">Reconhecimento no mural e participação em sorteios.</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 relative overflow-hidden">
+          <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-6 rounded-2xl border-2 border-blue-300 relative overflow-hidden shadow-sm">
             <div className="absolute top-0 right-0 p-4 opacity-10">
               <Cog size={80} />
             </div>
-            <h4 className="text-blue-800 font-bold flex items-center mb-2">
+            <h4 className="text-blue-900 font-black text-base flex items-center mb-2">
               <Droplets className="mr-2" size={18} />
               💡 Dica do Engenheiro:
             </h4>
-            <p className="text-blue-900 italic font-medium relative z-10">
+            <p className="text-blue-950 italic font-bold relative z-10">
               &quot;O segredo para chegar no Ouro não é correr, é ter constância. Quem faz o checklist todo dia e cuida da máquina como se fosse sua, sempre termina o mês no topo do ranking!&quot;
             </p>
           </div>
         </div>
+      )}
+
+      {activeTab === 'penalties' && (
+        <div className="bg-white dark:bg-[#151515] rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-200 dark:border-white/10 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h3 className="font-black text-red-700 dark:text-red-300 flex items-center gap-2">
+                <AlertOctagon size={18} />
+                {isAdmin ? 'Penalidades Aplicadas' : 'Minhas Penalidades'}
+              </h3>
+              <p className="text-xs text-red-700 dark:text-red-300 mt-1 font-medium">
+                {isAdmin
+                  ? 'Histórico de penalidades aplicadas aos operadores. Você vê a foto de evidência.'
+                  : 'Histórico de infrações registradas contra você. A foto é confidencial e visível apenas à gestão.'}
+              </p>
+            </div>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setPenaltyModalOpen(true)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-lg shadow-red-500/20"
+              >
+                <Plus size={14} />
+                Nova Penalidade
+              </button>
+            )}
+          </div>
+
+          {(() => {
+            const filtered = isAdmin
+              ? penalties
+              : penalties.filter((p) => p.operatorId === userProfile?.id);
+
+            if (filtered.length === 0) {
+              return (
+                <div className="p-10 text-center">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 flex items-center justify-center mb-3">
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <p className="text-emerald-700 dark:text-emerald-300 font-bold text-base">
+                    {isAdmin ? 'Nenhuma penalidade aplicada ainda.' : 'Parabéns! Você não possui penalidades registradas.'}
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1.5 font-medium">
+                    {isAdmin ? 'Use o botão acima para registrar uma nova infração.' : 'Continue mantendo a excelência!'}
+                  </p>
+                </div>
+              );
+            }
+
+            const totalPenalty = filtered.reduce((acc, p) => acc + p.points, 0);
+            return (
+              <div>
+                <div className="p-3 bg-gray-50 dark:bg-[#101010] border-b border-gray-200 dark:border-white/10 flex justify-between items-center text-xs">
+                  <span className="font-bold text-gray-700 dark:text-gray-200">
+                    {filtered.length} {filtered.length === 1 ? 'registro' : 'registros'}
+                  </span>
+                  <span className={`font-black text-base ${totalPenalty < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                    {totalPenalty} pts
+                  </span>
+                </div>
+                <div className="divide-y divide-gray-200 dark:divide-white/5">
+                  {filtered.map((p) => (
+                    <div key={p.id} className="p-4 flex gap-3 hover:bg-gray-50 dark:hover:bg-[#101010] transition-colors">
+                      {isAdmin && p.photoEvidencia ? (
+                        <div className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-red-300 flex-shrink-0 group">
+                          <img src={p.photoEvidencia} alt="evidência" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ImageIcon size={16} className="text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-black/20 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 flex-shrink-0">
+                          <Lock size={18} />
+                          <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Confidencial</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-bold text-sm text-gray-900 dark:text-gray-100">
+                            {p.infractionLabel}
+                          </p>
+                          <span className={`px-2 py-0.5 rounded-md font-black text-sm whitespace-nowrap ${p.points < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {p.points} pts
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-700 dark:text-gray-300 mt-1 font-medium">
+                          {isAdmin ? (
+                            <>Operador: <strong>{p.operatorName}</strong></>
+                          ) : (
+                            <>Aplicado por: <strong>{p.aplicadoPorNome}</strong></>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5">
+                          {new Date(p.dataEvento).toLocaleString('pt-BR')}
+                        </p>
+                        {p.observacoes && (
+                          <p className="text-xs text-gray-700 dark:text-gray-300 mt-1.5 italic border-l-2 border-gray-300 dark:border-white/10 pl-2">
+                            &quot;{p.observacoes}&quot;
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {isAdmin && (
+        <PenaltyModal
+          open={penaltyModalOpen}
+          onClose={() => setPenaltyModalOpen(false)}
+          employees={employees || []}
+          currentUserProfile={userProfile}
+          onApplied={reloadPenalties}
+        />
       )}
     </div>
   );

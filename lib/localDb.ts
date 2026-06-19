@@ -27,6 +27,24 @@ export interface LocalChecklist {
   defectPhotos?: string[]; // Compressed image base64 URIs saved locally
 }
 
+export interface LocalPenalty {
+  id: string;
+  operatorId: string;
+  operatorName: string;
+  infractionCode: string;        // codigo curto da infracao (ex: "DAILY_CHECK", "IDLE_ENGINE")
+  infractionLabel: string;       // descricao da infracao (ex: "Deixar de fazer o Daily Check")
+  points: number;                // pontos debitados (sempre negativo ou zero)
+  photoEvidencia: string;        // base64 (compressed) — VISIVEL APENAS PARA ADMIN
+  observacoes?: string;          // nota do admin
+  aplicadoPor: string;           // id do admin que aplicou
+  aplicadoPorNome: string;       // nome do admin
+  dataEvento: string;            // ISO timestamp
+  createdAt: string;
+  synced: number;
+  sync_failed?: number;
+  sync_error?: string;
+}
+
 export interface LocalRegistroDiario {
   id: string;          // uuid
   operatorId: string;
@@ -56,10 +74,11 @@ class CodelmaqLocalDatabase extends Dexie {
   users!: Table<LocalUser>;
   checklists!: Table<LocalChecklist>;
   registrosDiarios!: Table<LocalRegistroDiario>;
+  penalties!: Table<LocalPenalty>;
 
   constructor() {
     super('CodelmaqLocalDB');
-    
+
     // Define database tables and index keys using SQLite-equivalent schema indices
     this.version(1).stores({
       users: 'id, email, role, status, synced',
@@ -72,6 +91,14 @@ class CodelmaqLocalDatabase extends Dexie {
       users: 'id, email, role, status, synced',
       checklists: 'id, machineId, supervisorId, status, synced, sync_failed',
       registrosDiarios: 'id, operatorId, machineId, siteId, data, status, synced, sync_failed'
+    });
+
+    // v3: add LocalPenalty table (Programa de Excelencia — penalidades)
+    this.version(3).stores({
+      users: 'id, email, role, status, synced',
+      checklists: 'id, machineId, supervisorId, status, synced, sync_failed',
+      registrosDiarios: 'id, operatorId, machineId, siteId, data, status, synced, sync_failed',
+      penalties: 'id, operatorId, infractionCode, dataEvento, synced, sync_failed'
     });
   }
 }

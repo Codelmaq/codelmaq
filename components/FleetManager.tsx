@@ -1605,13 +1605,14 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
             </div>
           )}
           {currentView === 'performance' && (
-            <PerformanceView 
-              scoringRules={scoringRules} 
-              pointsHistory={pointsHistory} 
-              monthlyRanking={monthlyRanking} 
+            <PerformanceView
+              scoringRules={scoringRules}
+              pointsHistory={pointsHistory}
+              monthlyRanking={monthlyRanking}
               employees={employees}
               userProfile={userProfile}
               logs={dailyLogs}
+              isAdmin={isAdmin}
             />
           )}
           {currentView === 'fuel-truck' && (isAdmin || isMecanico) && (
