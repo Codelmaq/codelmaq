@@ -220,37 +220,42 @@ export const PerformanceView = ({
         </div>
       </div>
 
-      <div className="flex border-b border-gray-200 dark:border-white/10">
-        <button 
+      <div className="flex flex-wrap border-b border-gray-200 dark:border-white/10 -mb-px">
+        <button
           onClick={() => setActiveTab('ranking')}
-          className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 ${activeTab === 'ranking' ? 'border-[#eab308] text-[#eab308]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
+          className={`flex-1 min-w-[33%] sm:flex-none sm:min-w-0 px-3 sm:px-6 py-3 text-xs sm:text-sm font-bold transition-colors border-b-2 text-center whitespace-nowrap ${activeTab === 'ranking' ? 'border-[#eab308] text-[#eab308]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
         >
-          Ranking Mensal
+          <span className="sm:hidden">Ranking</span>
+          <span className="hidden sm:inline">Ranking Mensal</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('history')}
-          className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 ${activeTab === 'history' ? 'border-[#eab308] text-[#eab308]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
+          className={`flex-1 min-w-[33%] sm:flex-none sm:min-w-0 px-3 sm:px-6 py-3 text-xs sm:text-sm font-bold transition-colors border-b-2 text-center whitespace-nowrap ${activeTab === 'history' ? 'border-[#eab308] text-[#eab308]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
         >
-          Meu Extrato de Pontos
+          <span className="sm:hidden">Extrato</span>
+          <span className="hidden sm:inline">Meu Extrato de Pontos</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('rules')}
-          className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 ${activeTab === 'rules' ? 'border-[#eab308] text-[#eab308]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
+          className={`flex-1 min-w-[33%] sm:flex-none sm:min-w-0 px-3 sm:px-6 py-3 text-xs sm:text-sm font-bold transition-colors border-b-2 text-center whitespace-nowrap ${activeTab === 'rules' ? 'border-[#eab308] text-[#eab308]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
         >
-          Regras de Pontuação
+          <span className="sm:hidden">Regras</span>
+          <span className="hidden sm:inline">Regras de Pontuação</span>
         </button>
         <button
           onClick={() => setActiveTab('help')}
-          className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 ${activeTab === 'help' ? 'border-[#eab308] text-[#eab308]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
+          className={`flex-1 min-w-[33%] sm:flex-none sm:min-w-0 px-3 sm:px-6 py-3 text-xs sm:text-sm font-bold transition-colors border-b-2 text-center whitespace-nowrap ${activeTab === 'help' ? 'border-[#eab308] text-[#eab308]' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
         >
-          Regras e Ajuda
+          <span className="sm:hidden">Ajuda</span>
+          <span className="hidden sm:inline">Regras e Ajuda</span>
         </button>
         <button
           onClick={() => setActiveTab('penalties')}
-          className={`px-6 py-3 text-sm font-bold transition-colors border-b-2 flex items-center gap-1.5 ${activeTab === 'penalties' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
+          className={`flex-1 min-w-[33%] sm:flex-none sm:min-w-0 px-3 sm:px-6 py-3 text-xs sm:text-sm font-bold transition-colors border-b-2 text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${activeTab === 'penalties' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
         >
           <AlertOctagon size={14} />
-          {isAdmin ? 'Penalidades Aplicadas' : 'Minhas Penalidades'}
+          <span className="sm:hidden">Penalidades</span>
+          <span className="hidden sm:inline">{isAdmin ? 'Penalidades Aplicadas' : 'Minhas Penalidades'}</span>
         </button>
       </div>
 
