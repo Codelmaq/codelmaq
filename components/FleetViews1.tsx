@@ -1,10 +1,10 @@
 "use client";
 import React, { useState, useMemo } from 'react';
-import { 
-  Truck, Wrench, Users, Plus, Search, AlertTriangle, 
-  CheckCircle, Clock, MapPin, MoreVertical, X, 
+import {
+  Truck, Wrench, Users, Plus, Search, AlertTriangle,
+  CheckCircle, Clock, MapPin, MoreVertical, X,
   ShieldCheck, Trash2, HardHat, Edit2, Fuel, RotateCcw,
-  Upload, Download
+  Upload, Download, Database
 } from 'lucide-react';
 import { StatusBadge, UrgencyBadge } from './ui/Badges';
 import { ListaAprovacoes } from './ListaAprovacoes';
@@ -420,18 +420,21 @@ const MachineTable = ({ title, data, onRemoveMachine }: { title: string, data: a
   </div>
 );
 
-export const AdminView = ({ 
+export const AdminView = ({
   machines, onAddMachine, onEditMachine, onRemoveMachine, onImportInitialMachines, onExportFleet, onImportFleetJSON,
   employees, onAddEmployee, onRemoveEmployee, onUpdateEmployeeStatus,
   sites, onAddSite, onRemoveSite,
   onResetCounters, onUndoReset, canUndoReset,
-  onShowRLSModal, onCleanupLocalData
+  onShowRLSModal, onCleanupLocalData,
+  maintenanceTemplates, maintenancePlans, onAddTemplate, onAddMaintenancePlan, onUpdateMachine
 }: any) => {
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<any>(null);
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeeRole, setNewEmployeeRole] = useState('Operador de Máquinas');
   const [newSite, setNewSite] = useState('');
+  const [seedResult, setSeedResult] = useState<any>(null);
+  const [seeding, setSeeding] = useState(false);
 
   // Colaboradores Filters
   const [employeeSearch, setEmployeeSearch] = useState('');
@@ -468,6 +471,44 @@ export const AdminView = ({
   const [importConflictDecision, setImportConflictDecision] = useState<'substituir' | 'manter'>('substituir');
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; errors: number; skipped: number } | null>(null);
+
+  // Maintenance demo seed
+  const handleSeedMaintenance = async () => {
+    if (seeding) return;
+    setSeeding(true);
+    setSeedResult(null);
+    try {
+      const { computeSeedActions } = await import('@/lib/maintenanceSeed');
+      const { newTemplates, newPlans, machineUpdates, templatesSkipped, plansSkipped } = computeSeedActions(
+        maintenanceTemplates || [],
+        maintenancePlans || [],
+        machines || [],
+      );
+
+      for (const tpl of newTemplates) {
+        await onAddTemplate({ ...tpl, id: genId() });
+      }
+      for (const plan of newPlans) {
+        await onAddMaintenancePlan({ id: genId(), ...plan });
+      }
+      for (const upd of machineUpdates) {
+        await onUpdateMachine(upd.id, { lastPreventive: upd.lastPreventive });
+      }
+
+      setSeedResult({
+        templatesAdded: newTemplates.length,
+        templatesSkipped,
+        plansAdded: newPlans.length,
+        plansSkipped,
+        machinesUpdated: machineUpdates.length,
+      });
+    } catch (e) {
+      console.error('Erro ao popular planos de manutenção:', e);
+      setSeedResult({ error: true });
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const handleExportCSV = () => {
     try {
@@ -583,6 +624,55 @@ export const AdminView = ({
             Apenas administradores podem registrar novos equipamentos, membros da equipe e locais no sistema.
           </p>
         </div>
+      </div>
+
+      {/* Demo seed: popular planos de manutenção */}
+      <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-300 dark:border-blue-700/50 rounded-2xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-black text-blue-900 dark:text-blue-100 flex items-center gap-2">
+              <Database size={18} className="text-blue-700" />
+              Popular Planos de Manutenção (Demo)
+            </h3>
+            <p className="text-xs text-blue-800 dark:text-blue-200 mt-0.5 font-medium">
+              Cria 4 templates de preventiva + 3 planos por máquina existente, com lastExchange já vencido para disparar os alertas no Dashboard.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSeedMaintenance}
+            disabled={seeding}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-blue-500/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus size={14} />
+            {seeding ? 'Populando...' : 'Executar Demo'}
+          </button>
+        </div>
+        {seedResult && !seedResult.error && (
+          <div className="mt-3 p-3 bg-white/70 dark:bg-black/30 border border-blue-200 dark:border-blue-700/40 rounded-xl text-xs text-blue-900 dark:text-blue-200 space-y-1 font-medium">
+            <p>
+              <strong>{seedResult.templatesAdded}</strong> templates criados
+              {seedResult.templatesSkipped > 0 && ` (${seedResult.templatesSkipped} já existiam)`}.
+            </p>
+            <p>
+              <strong>{seedResult.plansAdded}</strong> planos de manutenção criados
+              {seedResult.plansSkipped > 0 && ` (${seedResult.plansSkipped} já existiam)`}.
+            </p>
+            {seedResult.machinesUpdated > 0 && (
+              <p>
+                <strong>{seedResult.machinesUpdated}</strong> máquinas tiveram o lastPreventive ajustado para disparar alertas.
+              </p>
+            )}
+            <p className="pt-1 italic text-blue-700 dark:text-blue-300">
+              Abra a aba &ldquo;Dashboard&rdquo; ou &ldquo;Controle Avulso&rdquo; para ver os alertas.
+            </p>
+          </div>
+        )}
+        {seedResult?.error && (
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/30 border border-red-300 dark:border-red-700/50 rounded-xl text-xs text-red-800 dark:text-red-200 font-medium">
+            Erro ao popular. Verifique o console.
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -663,6 +663,21 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
     setMachines(machines.map(m => m.id === updatedMachine.id ? updatedMachine : m));
   };
 
+  // Patch a few fields of a machine (used by the demo seed)
+  const handleUpdateMachine = async (machineId: string, patch: any) => {
+    const existing = machines.find((m) => m.id === machineId);
+    if (!existing) return;
+    const updated = { ...existing, ...patch };
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('ativos').update(mapMachineToDB(updated)).eq('id', machineId);
+      if (error) {
+        handleSupabaseError(error, false, "Erro ao atualizar veículo!");
+        return;
+      }
+    }
+    setMachines(machines.map((m) => (m.id === machineId ? updated : m)));
+  };
+
   const handleCleanupLocalData = async () => {
     if (!isSupabaseConfigured) {
       alert("Configuração de banco de dados não encontrada.");
@@ -1653,7 +1668,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
             <ReportsView logs={dailyLogs} machines={machines} employees={employees} />
           )}
           {currentView === 'admin' && isAdmin && (
-            <AdminView 
+            <AdminView
               machines={machines} onAddMachine={handleAddMachine} onEditMachine={handleEditMachine} onRemoveMachine={handleRemoveMachine} onImportInitialMachines={handleImportInitialMachines}
               onExportFleet={handleExportFleet} onImportFleetJSON={handleImportFleetJSON}
               employees={employees} onAddEmployee={handleAddEmployee} onRemoveEmployee={handleRemoveEmployee} onUpdateEmployeeStatus={handleUpdateEmployeeStatus}
@@ -1663,6 +1678,11 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
               canUndoReset={!!previousMachinesState}
               onShowRLSModal={() => setShowRLSModal(true)}
               onCleanupLocalData={handleCleanupLocalData}
+              maintenanceTemplates={maintenanceTemplates}
+              maintenancePlans={maintenancePlans}
+              onAddTemplate={handleAddTemplate}
+              onAddMaintenancePlan={handleAddMaintenancePlan}
+              onUpdateMachine={handleUpdateMachine}
             />
           )}
           {currentView === 'mobile-hub' && isAdmin && (
