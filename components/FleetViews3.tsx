@@ -149,6 +149,103 @@ export const PerformanceView = ({
         </div>
       </div>
 
+      {/* Minhas Penalidades em Destaque — acima do Bento Grid */}
+      {(() => {
+        const filtered = isAdmin
+          ? penalties
+          : penalties.filter((p) => p.operatorId === userProfile?.id);
+        const recent = filtered.slice(0, 3);
+        const total = filtered.reduce((acc, p) => acc + p.points, 0);
+        const hasPenalties = recent.length > 0;
+
+        return (
+          <div
+            className={`relative overflow-hidden rounded-2xl border-2 p-4 md:p-5 shadow-sm ${
+              hasPenalties
+                ? 'bg-gradient-to-r from-red-50 via-orange-50 to-red-50 border-red-300 dark:from-red-900/20 dark:via-orange-900/20 dark:to-red-900/20 dark:border-red-700/50'
+                : 'bg-gradient-to-r from-emerald-50 via-green-50 to-emerald-50 border-emerald-300 dark:from-emerald-900/20 dark:via-green-900/20 dark:to-emerald-900/20 dark:border-emerald-700/50'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${
+                    hasPenalties
+                      ? 'bg-red-500 text-white'
+                      : 'bg-emerald-500 text-white'
+                  }`}
+                >
+                  {hasPenalties ? <AlertOctagon size={22} /> : <CheckCircle2 size={22} />}
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className={`text-[10px] md:text-xs uppercase font-black tracking-wider ${
+                      hasPenalties ? 'text-red-700 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300'
+                    }`}
+                  >
+                    {isAdmin ? 'Penalidades Recentes (toda a frota)' : 'Minhas Penalidades'}
+                  </p>
+                  <h3
+                    className={`text-lg md:text-xl font-black leading-tight ${
+                      hasPenalties ? 'text-red-900 dark:text-red-100' : 'text-emerald-900 dark:text-emerald-100'
+                    }`}
+                  >
+                    {hasPenalties
+                      ? `${filtered.length} ${filtered.length === 1 ? 'penalidade ativa' : 'penalidades ativas'} — ${total} pts`
+                      : 'Você está em dia — continue assim!'}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('penalties')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider whitespace-nowrap flex-shrink-0 cursor-pointer transition-colors ${
+                  hasPenalties
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
+              >
+                {hasPenalties ? 'Ver todas' : 'Ver histórico'}
+              </button>
+            </div>
+
+            {hasPenalties ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
+                {recent.map((p) => (
+                  <div
+                    key={p.id}
+                    className="bg-white/80 dark:bg-black/30 border-2 border-red-200 dark:border-red-800/50 rounded-xl p-3 flex items-center gap-2.5"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 flex items-center justify-center flex-shrink-0">
+                      <AlertOctagon size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
+                        {p.infractionLabel}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] font-mono font-black text-red-700 dark:text-red-300">
+                          {p.points} pts
+                        </span>
+                        <span className="text-[10px] text-gray-600 dark:text-gray-400">
+                          · {new Date(p.dataEvento).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs md:text-sm text-emerald-800 dark:text-emerald-200 font-medium">
+                {isAdmin
+                  ? 'Nenhuma penalidade foi aplicada na frota ainda.'
+                  : 'Mantenha a excelência: faça o checklist, cuide do equipamento e respeite as regras de segurança.'}
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Bento Grid — Resumo Operacional de Desempenho */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Pontuação */}
