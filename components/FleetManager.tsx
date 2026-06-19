@@ -5,7 +5,8 @@ import {
   ClipboardList, Cog, Gauge, BarChart3, Briefcase, Menu,
   FileText, Fuel, Droplets, Trophy, AlertTriangle,
   Users, ChevronRight, ChevronLeft, LogOut, Sparkles,
-  QrCode
+  QrCode,
+  User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -277,7 +278,6 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
     alert(`Abastecimento do equipamento ${debit.machineId} registrado com sucesso!`);
   };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [dailyLogMode, setDailyLogMode] = useState<'offline-forms' | 'online-logs'>('offline-forms');
   const isAuthenticated = !!userProfile;
   
   
@@ -1560,40 +1560,48 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
           )}
           {currentView === 'daily-logs' && (
             <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-[#101010]/30 border border-[#7c4ff0]/20 dark:border-[#a17af0]/15 shadow-sm rounded-2xl p-4">
-                <div>
-                  <h3 className="text-sm font-bold text-[#eab308] dark:text-[#eab308] font-heading uppercase">
-                    Canal de Entrada de Dados de Frota
-                  </h3>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400">Selecione o método operacional de apontamento de checklist e horários.</p>
+              {/* Operator Profile Card (always visible) */}
+              <div className="flex items-center gap-3 p-4 bg-white dark:bg-[#101010]/30 border border-[#7c4ff0]/20 dark:border-[#a17af0]/15 shadow-sm rounded-2xl">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#eab308] to-[#ca8a04] flex items-center justify-center text-yellow-950 font-bold text-lg flex-shrink-0">
+                  {userProfile?.nome ? userProfile.nome.charAt(0).toUpperCase() : <User size={20} />}
                 </div>
-                <div className="flex bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl text-xs gap-1">
-                  <button 
-                    type="button"
-                    onClick={() => setDailyLogMode('offline-forms')}
-                    className={`px-3 py-1.5 rounded-lg font-bold font-heading uppercase transition-all flex items-center gap-1 cursor-pointer ${dailyLogMode === 'offline-forms' ? 'bg-[#ca8a04] dark:bg-[#eab308] text-white shadow-md shadow-yellow-500/20 font-bold' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'}`}
-                  >
-                    🚀 Formulários Offline
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setDailyLogMode('online-logs')}
-                    className={`px-3 py-1.5 rounded-lg font-bold font-heading uppercase transition-all flex items-center gap-1 cursor-pointer ${dailyLogMode === 'online-logs' ? 'bg-[#ca8a04] dark:bg-[#eab308] text-white shadow-md shadow-yellow-500/20 font-bold' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'}`}
-                  >
-                    ☁️ Tabela Online
-                  </button>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Operador Identificado</p>
+                  <p className="text-base font-bold text-gray-800 dark:text-gray-100 truncate">
+                    {userProfile?.nome || (isAdmin ? 'Administrador' : 'Operador')}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {userProfile?.email || '—'} {isAdmin ? '· Administrador' : `· ${userProfile?.role || 'Colaborador'}`}
+                  </p>
+                </div>
+                <div className="hidden sm:flex flex-col items-end text-right">
+                  <span className="text-[9px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">ID</span>
+                  <span className="text-[10px] font-mono text-gray-600 dark:text-gray-300 truncate max-w-[120px]" title={userProfile?.id}>
+                    {userProfile?.id?.slice(0, 8) || '—'}
+                  </span>
                 </div>
               </div>
-              
-              {dailyLogMode === 'offline-forms' ? (
-                <OfflineFormPanel 
+
+              {/* Unified Checklist Form (always available) */}
+              <OfflineFormPanel 
+                machines={machines} 
+                sites={sites} 
+                employees={employees} 
+                currentUserProfile={userProfile} 
+              />
+
+              {/* Admin-only: Online Logs Table + Exports + History */}
+              {isAdmin && (
+                <DailyLogView 
+                  logs={dailyLogs} 
                   machines={machines} 
-                  sites={sites} 
                   employees={employees} 
-                  currentUserProfile={userProfile} 
+                  sites={sites} 
+                  onAddLog={handleAddDailyLog} 
+                  onEditLog={handleEditDailyLog} 
+                  onDeleteLog={handleDeleteDailyLog} 
+                  isAdminAuthenticated={isAdmin} 
                 />
-              ) : (
-                <DailyLogView logs={dailyLogs} machines={machines} employees={employees} sites={sites} onAddLog={handleAddDailyLog} onEditLog={handleEditDailyLog} onDeleteLog={handleDeleteDailyLog} isAdminAuthenticated={isAdmin} />
               )}
             </div>
           )}
