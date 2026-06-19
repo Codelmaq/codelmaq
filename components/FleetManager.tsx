@@ -1586,7 +1586,6 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
               <OfflineFormPanel 
                 machines={machines} 
                 sites={sites} 
-                employees={employees} 
                 currentUserProfile={userProfile} 
               />
 

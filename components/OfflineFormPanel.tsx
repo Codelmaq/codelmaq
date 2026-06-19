@@ -27,14 +27,12 @@ import { StartShiftModal } from './StartShiftModal';
 interface OfflineFormPanelProps {
   machines?: Array<{ id: string; name: string; type: string; measureUnit?: string }>;
   sites?: string[];
-  employees?: Array<{ id: string; nome: string; role: string }>;
   currentUserProfile?: { id: string; nome: string; role: string; email: string } | null;
 }
 
 export function OfflineFormPanel({ 
   machines = [], 
   sites = [], 
-  employees = [],
   currentUserProfile 
 }: OfflineFormPanelProps) {
   // Navigation tabs for the offline cockpit
@@ -55,7 +53,6 @@ export function OfflineFormPanel({
   // Unified form state
   const [machineId, setMachineId] = useState('');
   const [siteId, setSiteId] = useState('');
-  const [operatorId, setOperatorId] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [compressingText, setCompressingText] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -183,8 +180,8 @@ export function OfflineFormPanel({
       alert("Selecione a máquina.");
       return;
     }
-    if (!operatorId) {
-      alert("Selecione o Operador de Máquinas.");
+    if (!currentUserProfile?.id) {
+      alert("Operador não identificado. Faça login novamente.");
       return;
     }
 
@@ -208,6 +205,7 @@ export function OfflineFormPanel({
 
     const recordId = genId();
     const today = new Date().toISOString().split('T')[0];
+    const operatorId = currentUserProfile.id;
 
     const newChecklist = {
       id: recordId,
@@ -247,7 +245,6 @@ export function OfflineFormPanel({
       setSavedSuccess(true);
       setMachineId('');
       setSiteId('');
-      setOperatorId('');
       setChecklistAnswers({
         motor: 'bom',
         hidraulica: 'bom',
@@ -424,15 +421,15 @@ export function OfflineFormPanel({
             </div>
           )}
 
-          {/* Linha 1: Ativo + Obra + Operador */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Ativo da Frota</label>
+          {/* Linha 1: Ativo + Obra */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col space-y-2">
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Ativo da Frota</label>
               <select
                 required
                 value={machineId}
                 onChange={(e) => setMachineId(e.target.value)}
-                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
+                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 text-lg md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-medium"
               >
                 <option value="">Selecione a máquina...</option>
                 {machines.map((m) => (
@@ -443,12 +440,12 @@ export function OfflineFormPanel({
               </select>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Obra de Operação</label>
+            <div className="flex flex-col space-y-2">
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Obra de Operação</label>
               <select
                 value={siteId}
                 onChange={(e) => setSiteId(e.target.value)}
-                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
+                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 text-lg md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-medium"
               >
                 {sites.map((st: any, idx: number) => (
                   <option key={st.id || idx} value={st.nome || st.name || st}>
@@ -460,74 +457,57 @@ export function OfflineFormPanel({
                 )}
               </select>
             </div>
-
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Operador de Máquinas</label>
-              <select
-                required
-                value={operatorId}
-                onChange={(e) => setOperatorId(e.target.value)}
-                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
-              >
-                <option value="">Selecione o operador...</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nome} ({e.role || e.funcao || 'colaborador'})
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
 
-          {/* Linha 2: Hor.Inicial + Hor.Final + Abastecimento + Data */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Horômetro / KM Inicial</label>
+          {/* Linha 2: Hor.Inicial + Hor.Final + Abastecimento + Data — empilhados no mobile */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col space-y-2">
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Horímetro / KM Inicial</label>
               <div className="relative">
-                <Gauge className="absolute left-3 top-3.5 md:top-2.5 text-gray-500 dark:text-gray-400" size={16} />
+                <Gauge className="absolute left-4 top-1/2 -translate-y-1/2 md:top-2.5 md:translate-y-0 text-gray-600 dark:text-gray-300" size={20} />
                 <input
                   type="number"
                   required
                   ref={horimetroInicialRef}
                   placeholder="Ex: 1450"
-                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 pl-10 md:pl-9 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
+                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Horômetro / KM Final</label>
+            <div className="flex flex-col space-y-2">
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Horímetro / KM Final</label>
               <div className="relative">
-                <Gauge className="absolute left-3 top-3.5 md:top-2.5 text-gray-500 dark:text-gray-400" size={16} />
+                <Gauge className="absolute left-4 top-1/2 -translate-y-1/2 md:top-2.5 md:translate-y-0 text-gray-600 dark:text-gray-300" size={20} />
                 <input
                   type="number"
                   required
                   ref={horimetroFinalRef}
                   placeholder="Ex: 1462"
-                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 pl-10 md:pl-9 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
+                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Abastecimento (Litros)</label>
+            <div className="flex flex-col space-y-2">
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Abastecimento (Litros)</label>
               <div className="relative">
-                <Fuel className="absolute left-3 top-3.5 md:top-2.5 text-gray-500 dark:text-gray-400" size={16} />
+                <Fuel className="absolute left-4 top-1/2 -translate-y-1/2 md:top-2.5 md:translate-y-0 text-gray-600 dark:text-gray-300" size={20} />
                 <input
                   type="number"
                   ref={fuelAddedRef}
                   placeholder="0"
-                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 pl-10 md:pl-9 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
+                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col space-y-1.5">
-              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Data do Diário</label>
+            <div className="flex flex-col space-y-2">
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Data do Diário</label>
               <input
                 type="text"
                 disabled
-                className="bg-gray-100 dark:bg-[#151515]/5 border-2 border-gray-300 dark:border-white/5 rounded-xl p-3 md:p-2.5 text-base md:text-xs text-gray-800 dark:text-gray-300 font-bold"
+                className="w-full bg-gray-100 dark:bg-[#151515]/5 border-2 border-gray-300 dark:border-white/5 rounded-xl p-4 md:p-2.5 text-xl md:text-xs text-gray-900 dark:text-gray-200 font-bold"
                 value={new Date().toLocaleDateString('pt-BR')}
               />
             </div>
