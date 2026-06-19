@@ -366,11 +366,8 @@ export function OfflineFormPanel({
         <div className="min-w-0">
           <h2 className="text-2xl md:text-xl font-bold text-gray-900 dark:text-white font-heading tracking-tight flex items-center gap-2">
             <Loader2 className={`text-[#eab308] ${isSyncing ? 'animate-spin' : ''}`} size={24} />
-            PAINEL OPERACIONAL OFFLINE-FIRST
-          </h2>
-          <p className="text-base md:text-xs text-gray-700 dark:text-gray-300 mt-1.5 md:mt-1 font-medium">
             Registro diário completo com vistoria — tudo offline.
-          </p>
+          </h2>
         </div>
 
         <button
