@@ -399,11 +399,11 @@ export function OfflineFormPanel({
     <div className="max-w-4xl mx-auto space-y-6">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 bg-white dark:bg-[#101010]/30 border-2 border-gray-300 dark:border-[#a17af0]/15 shadow-sm rounded-2xl">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 bg-white dark:bg-[#101010]/30 border-2 border-gray-300 dark:border-[#a17af0]/15 shadow-sm rounded-2xl">
         <div className="min-w-0">
-          <h2 className="text-2xl md:text-xl font-bold text-gray-900 dark:text-white font-heading tracking-tight flex items-center gap-2">
-            <Loader2 className={`text-[#eab308] ${isSyncing ? 'animate-spin' : ''}`} size={24} />
-            Registro diário completo com vistoria — tudo offline.
+          <h2 className="text-sm md:text-xs font-bold text-gray-700 dark:text-gray-300 font-heading tracking-wider uppercase flex items-center gap-2">
+            <Loader2 className={`text-[#eab308] ${isSyncing ? 'animate-spin' : ''}`} size={14} />
+            Registro diário
           </h2>
         </div>
 
