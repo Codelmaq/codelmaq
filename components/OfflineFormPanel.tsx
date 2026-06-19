@@ -365,13 +365,13 @@ export function OfflineFormPanel({
     <div className="max-w-4xl mx-auto space-y-6">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 bg-white dark:bg-[#101010]/30 border border-[#7c4ff0]/20 dark:border-[#a17af0]/15 shadow-sm rounded-2xl">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-5 bg-white dark:bg-[#101010]/30 border-2 border-gray-300 dark:border-[#a17af0]/15 shadow-sm rounded-2xl">
         <div className="min-w-0">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white font-heading tracking-tight flex items-center gap-2">
-            <Loader2 className={`text-[#eab308] ${isSyncing ? 'animate-spin' : ''}`} size={20} />
+          <h2 className="text-2xl md:text-xl font-bold text-gray-900 dark:text-white font-heading tracking-tight flex items-center gap-2">
+            <Loader2 className={`text-[#eab308] ${isSyncing ? 'animate-spin' : ''}`} size={24} />
             PAINEL OPERACIONAL OFFLINE-FIRST
           </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-base md:text-xs text-gray-700 dark:text-gray-300 mt-1.5 md:mt-1 font-medium">
             Registro diário completo com vistoria — tudo offline.
           </p>
         </div>
@@ -379,28 +379,28 @@ export function OfflineFormPanel({
         <button
           type="button"
           onClick={() => setScannerOpen(true)}
-          className="w-full md:w-auto px-4 py-2.5 bg-gradient-to-br from-[#eab308] to-[#ca8a04] hover:from-[#facc15] hover:to-[#eab308] text-white font-black rounded-xl shadow-md shadow-yellow-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
+          className="w-full md:w-auto px-5 py-3 md:px-4 md:py-2.5 bg-gradient-to-br from-[#eab308] to-[#ca8a04] hover:from-[#facc15] hover:to-[#eab308] text-white font-black rounded-xl shadow-md shadow-yellow-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all text-base md:text-xs"
         >
-          <QrCode size={16} />
+          <QrCode size={20} className="md:!size-4" />
           Escanear QR Code
         </button>
 
-        <div className="flex bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl text-xs gap-1">
+        <div className="flex bg-zinc-100 dark:bg-zinc-900 border-2 border-zinc-300 dark:border-zinc-800 p-1.5 md:p-1 rounded-xl text-sm md:text-xs gap-1 w-full md:w-auto">
           <button 
             type="button" 
             onClick={() => setActiveTab('checklist')}
-            className={`px-3 py-1.5 rounded-lg font-bold font-heading uppercase transition-all flex items-center gap-1 cursor-pointer ${activeTab === 'checklist' ? 'bg-[#ca8a04] dark:bg-[#eab308] text-white shadow-md shadow-yellow-500/20 font-bold' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'}`}
+            className={`flex-1 md:flex-none px-4 py-2.5 md:px-3 md:py-1.5 rounded-lg font-bold font-heading uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${activeTab === 'checklist' ? 'bg-[#ca8a04] dark:bg-[#eab308] text-white shadow-md shadow-yellow-500/20 font-bold' : 'text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'}`}
           >
-            <ClipboardList size={13} />
+            <ClipboardList size={16} className="md:!size-3" />
             Checklist Diário
           </button>
 
           <button 
             type="button" 
             onClick={() => setActiveTab('history')}
-            className={`px-3 py-1.5 rounded-lg font-bold font-heading uppercase transition-all flex items-center gap-1 cursor-pointer ${activeTab === 'history' ? 'bg-[#ca8a04] dark:bg-[#eab308] text-white shadow-md shadow-yellow-500/20 font-bold' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'}`}
+            className={`flex-1 md:flex-none px-4 py-2.5 md:px-3 md:py-1.5 rounded-lg font-bold font-heading uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${activeTab === 'history' ? 'bg-[#ca8a04] dark:bg-[#eab308] text-white shadow-md shadow-yellow-500/20 font-bold' : 'text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'}`}
           >
-            <Database size={13} />
+            <Database size={16} className="md:!size-3" />
             Fila Local
           </button>
         </div>
@@ -408,31 +408,31 @@ export function OfflineFormPanel({
 
       {/* COMPRESSING INDICATOR */}
       {compressingText && (
-        <div className="p-3 bg-yellow-500/15 border border-yellow-500/20 text-yellow-300 rounded-xl text-center text-xs flex items-center justify-center gap-2 animate-pulse">
-          <Camera className="animate-bounce" size={14} />
+        <div className="p-3 bg-yellow-500/15 border border-yellow-500/30 text-yellow-700 dark:text-yellow-300 rounded-xl text-center text-base md:text-xs font-medium flex items-center justify-center gap-2 animate-pulse">
+          <Camera className="animate-bounce" size={18} />
           <span>{compressingText}</span>
         </div>
       )}
 
       {/* UNIFIED FORM */}
       {activeTab === 'checklist' && (
-        <form onSubmit={handleSubmit} className="space-y-4 bg-white dark:bg-[#151515]/5 border border-white/10 rounded-2xl p-5 md:p-6 backdrop-blur-md">
+        <form onSubmit={handleSubmit} className="space-y-4 bg-white dark:bg-[#151515]/5 border-2 border-gray-300 dark:border-white/10 rounded-2xl p-4 sm:p-5 md:p-6 backdrop-blur-md shadow-sm">
           {savedSuccess && (
-            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs flex items-center gap-2">
-              <CheckCircle size={16} />
-              <span><strong>Registro salvo!</strong> Checklist + Parte Diária gravados com sucesso no IndexedDB local. Sincronização automática quando houver internet.</span>
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl text-sm sm:text-base font-medium flex items-center gap-2">
+              <CheckCircle size={18} />
+              <span><strong className="font-bold">Registro salvo!</strong> Checklist e Parte Diária gravados com sucesso no aparelho. Sincronização automática quando houver internet.</span>
             </div>
           )}
 
           {/* Linha 1: Ativo + Obra + Operador */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Ativo da Frota</label>
+              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Ativo da Frota</label>
               <select
                 required
                 value={machineId}
                 onChange={(e) => setMachineId(e.target.value)}
-                className="bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
+                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
               >
                 <option value="">Selecione a máquina...</option>
                 {machines.map((m) => (
@@ -444,11 +444,11 @@ export function OfflineFormPanel({
             </div>
 
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Obra de Operação</label>
+              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Obra de Operação</label>
               <select
                 value={siteId}
                 onChange={(e) => setSiteId(e.target.value)}
-                className="bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
+                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
               >
                 {sites.map((st: any, idx: number) => (
                   <option key={st.id || idx} value={st.nome || st.name || st}>
@@ -462,12 +462,12 @@ export function OfflineFormPanel({
             </div>
 
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Operador de Máquinas</label>
+              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Operador de Máquinas</label>
               <select
                 required
                 value={operatorId}
                 onChange={(e) => setOperatorId(e.target.value)}
-                className="bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
+                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
               >
                 <option value="">Selecione o operador...</option>
                 {employees.map((e) => (
@@ -482,61 +482,61 @@ export function OfflineFormPanel({
           {/* Linha 2: Hor.Inicial + Hor.Final + Abastecimento + Data */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Horômetro / KM Inicial</label>
+              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Horômetro / KM Inicial</label>
               <div className="relative">
-                <Gauge className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
+                <Gauge className="absolute left-3 top-3.5 md:top-2.5 text-gray-500 dark:text-gray-400" size={16} />
                 <input
                   type="number"
                   required
                   ref={horimetroInicialRef}
                   placeholder="Ex: 1450"
-                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
+                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 pl-10 md:pl-9 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
                 />
               </div>
             </div>
 
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Horômetro / KM Final</label>
+              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Horômetro / KM Final</label>
               <div className="relative">
-                <Gauge className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
+                <Gauge className="absolute left-3 top-3.5 md:top-2.5 text-gray-500 dark:text-gray-400" size={16} />
                 <input
                   type="number"
                   required
                   ref={horimetroFinalRef}
                   placeholder="Ex: 1462"
-                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
+                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 pl-10 md:pl-9 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
                 />
               </div>
             </div>
 
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Abastecimento (Litros)</label>
+              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Abastecimento (Litros)</label>
               <div className="relative">
-                <Fuel className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400" size={14} />
+                <Fuel className="absolute left-3 top-3.5 md:top-2.5 text-gray-500 dark:text-gray-400" size={16} />
                 <input
                   type="number"
                   ref={fuelAddedRef}
                   placeholder="0"
-                  className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 pl-9 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
+                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 pl-10 md:pl-9 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
                 />
               </div>
             </div>
 
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Data do Diário</label>
+              <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Data do Diário</label>
               <input
                 type="text"
                 disabled
-                className="bg-gray-100 dark:bg-[#151515]/5 border border-gray-200 dark:border-white/5 rounded-xl p-2.5 text-xs text-gray-500 dark:text-gray-400 font-semibold"
+                className="bg-gray-100 dark:bg-[#151515]/5 border-2 border-gray-300 dark:border-white/5 rounded-xl p-3 md:p-2.5 text-base md:text-xs text-gray-800 dark:text-gray-300 font-bold"
                 value={new Date().toLocaleDateString('pt-BR')}
               />
             </div>
           </div>
 
           {/* ITENS DE VISTORIA */}
-          <div className="pt-4 border-t border-white/5 space-y-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-              <ClipboardList size={14} />
+          <div className="pt-4 border-t border-gray-200 dark:border-white/5 space-y-3">
+            <span className="text-sm md:text-xs font-bold uppercase tracking-wider text-yellow-700 dark:text-yellow-400 flex items-center gap-1.5">
+              <ClipboardList size={16} />
               ITENS DE VISTORIA SENSÍVEIS (SELECIONE O STATUS)
             </span>
 
@@ -556,27 +556,27 @@ export function OfflineFormPanel({
                 const currentVal = checklistAnswers[itemKey];
 
                 return (
-                  <div key={itemKey} className="p-3 bg-gray-50 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/5 flex flex-col justify-between space-y-2">
-                    <span className="text-xs font-medium text-gray-900 dark:text-white">{labelMap[itemKey] || itemKey}</span>
-                    <div className="grid grid-cols-3 gap-1">
+                  <div key={itemKey} className="p-4 md:p-3 bg-white dark:bg-black/20 rounded-xl border-2 border-gray-300 dark:border-white/5 flex flex-col justify-between space-y-2.5">
+                    <span className="text-base md:text-xs font-bold text-gray-900 dark:text-white">{labelMap[itemKey] || itemKey}</span>
+                    <div className="grid grid-cols-3 gap-1.5">
                       <button
                         type="button"
                         onClick={() => setChecklistAnswers(prev => ({ ...prev, [itemKey]: 'bom' }))}
-                        className={`py-1 rounded text-[10px] font-bold text-center cursor-pointer transition-colors ${currentVal === 'bom' ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/25' : 'bg-gray-200 dark:bg-black/30 text-gray-600 dark:text-gray-400 border border-transparent'}`}
+                        className={`py-2.5 md:py-1.5 rounded-lg text-sm md:text-[10px] font-bold text-center cursor-pointer transition-colors ${currentVal === 'bom' ? 'bg-emerald-200 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-2 border-emerald-500 dark:border-emerald-500/40' : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-transparent'}`}
                       >
                         Bom
                       </button>
                       <button
                         type="button"
                         onClick={() => setChecklistAnswers(prev => ({ ...prev, [itemKey]: 'reparar' }))}
-                        className={`py-1 rounded text-[10px] font-bold text-center cursor-pointer transition-colors ${currentVal === 'reparar' ? 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/25' : 'bg-gray-200 dark:bg-black/30 text-gray-600 dark:text-gray-400 border border-transparent'}`}
+                        className={`py-2.5 md:py-1.5 rounded-lg text-sm md:text-[10px] font-bold text-center cursor-pointer transition-colors ${currentVal === 'reparar' ? 'bg-amber-200 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-2 border-amber-500 dark:border-amber-500/40' : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-transparent'}`}
                       >
                         Reparo
                       </button>
                       <button
                         type="button"
                         onClick={() => setChecklistAnswers(prev => ({ ...prev, [itemKey]: 'critico' }))}
-                        className={`py-1 rounded text-[10px] font-bold text-center cursor-pointer transition-colors ${currentVal === 'critico' ? 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-500 border border-red-300 dark:border-red-500/25' : 'bg-gray-200 dark:bg-black/30 text-gray-600 dark:text-gray-400 border border-transparent'}`}
+                        className={`py-2.5 md:py-1.5 rounded-lg text-sm md:text-[10px] font-bold text-center cursor-pointer transition-colors ${currentVal === 'critico' ? 'bg-red-200 dark:bg-red-500/20 text-red-800 dark:text-red-300 border-2 border-red-500 dark:border-red-500/40' : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-transparent'}`}
                       >
                         Avaria
                       </button>
@@ -588,16 +588,16 @@ export function OfflineFormPanel({
           </div>
 
           {/* FOTOS */}
-          <div className="pt-4 border-t border-white/5 space-y-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-yellow-400 flex items-center gap-1">
-              <Camera size={14} />
+          <div className="pt-4 border-t border-gray-200 dark:border-white/5 space-y-3">
+            <span className="text-sm md:text-xs font-bold uppercase tracking-wider text-yellow-700 dark:text-yellow-400 flex items-center gap-1.5">
+              <Camera size={16} />
               FOTOS DA OPERAÇÃO / HORÍMETRO DO VEÍCULO
             </span>
 
             <div className="flex flex-wrap gap-3 items-center">
-              <label className="w-24 h-24 bg-[#101010] hover:bg-neutral-900 border-2 border-dashed border-white/15 rounded-xl flex flex-col items-center justify-center cursor-pointer text-gray-500 dark:text-gray-400 transition-colors group">
-                <Camera size={20} className="group-hover:text-[#eab308] transition-colors" />
-                <span className="text-[9px] text-gray-400 mt-1 font-semibold text-center leading-tight">Anexar<br/>Fotos</span>
+              <label className="w-28 h-28 md:w-24 md:h-24 bg-gray-50 hover:bg-gray-100 dark:bg-[#101010] dark:hover:bg-neutral-900 border-2 border-dashed border-gray-400 dark:border-white/20 rounded-xl flex flex-col items-center justify-center cursor-pointer text-gray-700 dark:text-gray-300 transition-colors group">
+                <Camera size={24} className="md:!size-5 group-hover:text-[#eab308] transition-colors" />
+                <span className="text-xs md:text-[9px] text-gray-600 dark:text-gray-300 mt-1.5 md:mt-1 font-bold text-center leading-tight">Anexar<br/>Fotos</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -608,18 +608,18 @@ export function OfflineFormPanel({
               </label>
 
               {photos.map((dataUri, idx) => (
-                <div key={idx} className="relative w-24 h-24 rounded-xl overflow-hidden border border-white/10 group bg-black">
+                <div key={idx} className="relative w-28 h-28 md:w-24 md:h-24 rounded-xl overflow-hidden border-2 border-gray-300 dark:border-white/10 group bg-black">
                   <img src={dataUri} alt="preview" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/60 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <button
                       type="button"
                       onClick={() => removePhoto(idx)}
-                      className="p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors cursor-pointer"
+                      className="p-2 md:p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors cursor-pointer"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={18} className="md:!size-3.5" />
                     </button>
                   </div>
-                  <span className="absolute bottom-1 right-1 bg-black/70 text-[8px] font-mono text-emerald-400 px-1 rounded">
+                  <span className="absolute bottom-1 right-1 bg-black/80 text-[10px] md:text-[8px] font-mono text-emerald-300 px-1.5 md:px-1 rounded font-bold">
                     JPEG
                   </span>
                 </div>
@@ -629,12 +629,12 @@ export function OfflineFormPanel({
 
           {/* Comentários */}
           <div className="flex flex-col space-y-1.5 pt-2">
-            <label className="text-[10px] text-gray-700 dark:text-gray-400 uppercase font-bold tracking-wider">Comentários e Intercorrências</label>
+            <label className="text-xs md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Comentários e Intercorrências</label>
             <textarea
               ref={commentsRef}
-              rows={2}
+              rows={3}
               placeholder="Houve intercorrências, quebras, chuvas paralisantes ou abastecimento extra? Descreva..."
-              className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl p-2.5 text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
+              className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-3 md:p-2.5 text-base md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none"
             />
           </div>
 
@@ -642,9 +642,9 @@ export function OfflineFormPanel({
           <div className="pt-2 flex justify-end">
             <button
               type="submit"
-              className="px-6 py-2.5 bg-[#eab308] hover:bg-[#ca8a04] text-black font-bold font-heading rounded-xl cursor-pointer text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-lg shadow-yellow-500/10"
+              className="w-full md:w-auto px-6 py-3 md:py-2.5 bg-[#eab308] hover:bg-[#ca8a04] text-black font-bold font-heading rounded-xl cursor-pointer text-base md:text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-lg shadow-yellow-500/20"
             >
-              <CheckCircle size={14} />
+              <CheckCircle size={18} className="md:!size-3.5" />
               Fechar Turno Diário Offline-First
             </button>
           </div>
@@ -653,14 +653,14 @@ export function OfflineFormPanel({
 
       {/* TAB C: FILA LOCAL STATUS HISTORY */}
       {activeTab === 'history' && (
-        <div className="space-y-4 bg-white dark:bg-[#151515]/5 border border-white/10 rounded-2xl p-5 md:p-6 backdrop-blur-md">
-          <div className="flex justify-between items-center pb-3 border-b border-white/5">
+        <div className="space-y-4 bg-white dark:bg-[#151515]/5 border-2 border-gray-300 dark:border-white/10 rounded-2xl p-5 md:p-6 backdrop-blur-md">
+          <div className="flex justify-between items-center pb-3 border-b-2 border-gray-200 dark:border-white/5">
             <div>
-              <h3 className="text-sm font-bold text-white font-heading uppercase flex items-center gap-1.5">
-                <Database className="text-[#eab308]" size={15} />
+              <h3 className="text-lg md:text-sm font-bold text-gray-900 dark:text-white font-heading uppercase flex items-center gap-1.5">
+                <Database className="text-[#eab308]" size={20} />
                 FILA LOCAL — INDEXEDDB
               </h3>
-              <p className="text-[10px] text-gray-400">Pendentes aguardam conexão. Falhos precisam de ação: corrija o cadastro ou descarte.</p>
+              <p className="text-sm md:text-[10px] text-gray-600 dark:text-gray-300 mt-1 font-medium">Pendentes aguardam conexão. Falhos precisam de ação: corrija o cadastro ou descarte.</p>
             </div>
           </div>
 
@@ -674,8 +674,8 @@ export function OfflineFormPanel({
 
               return (
                 <div>
-                  <h4 className="text-xs font-bold text-yellow-400 mb-2 uppercase tracking-wider flex items-center gap-1">
-                    <ClipboardList size={12} />
+                  <h4 className="text-base md:text-xs font-bold text-yellow-700 dark:text-yellow-400 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                    <ClipboardList size={16} className="md:!size-3" />
                     Checklists Diários — {all.length} no total
                   </h4>
 

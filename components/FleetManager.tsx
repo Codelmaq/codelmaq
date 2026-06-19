@@ -1561,17 +1561,17 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
           {currentView === 'daily-logs' && (
             <div className="space-y-6">
               {/* Operator Profile Card (always visible) */}
-              <div className="flex items-center gap-3 p-4 bg-white dark:bg-[#101010]/30 border border-[#7c4ff0]/20 dark:border-[#a17af0]/15 shadow-sm rounded-2xl">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#eab308] to-[#ca8a04] flex items-center justify-center text-yellow-950 font-bold text-lg flex-shrink-0">
-                  {userProfile?.nome ? userProfile.nome.charAt(0).toUpperCase() : <User size={20} />}
+              <div className="flex items-center gap-4 md:gap-3 p-5 md:p-4 bg-white dark:bg-[#101010]/30 border-2 border-gray-300 dark:border-[#a17af0]/15 shadow-sm rounded-2xl">
+                <div className="w-16 h-16 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-[#eab308] to-[#ca8a04] flex items-center justify-center text-yellow-950 font-bold text-2xl md:text-lg flex-shrink-0">
+                  {userProfile?.nome ? userProfile.nome.charAt(0).toUpperCase() : <User size={28} className="md:!size-5" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Operador Identificado</p>
-                  <p className="text-base font-bold text-gray-800 dark:text-gray-100 truncate">
+                  <p className="text-sm md:text-[10px] text-gray-600 dark:text-gray-300 uppercase font-bold tracking-wider">Operador Identificado</p>
+                  <p className="text-xl md:text-base font-bold text-gray-900 dark:text-gray-100 truncate">
                     {userProfile?.nome || (isAdmin ? 'Administrador' : 'Operador')}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                    {userProfile?.email || '—'} {isAdmin ? '· Administrador' : `· ${userProfile?.role || 'Colaborador'}`}
+                  <p className="text-base md:text-xs text-gray-700 dark:text-gray-300 truncate font-medium">
+                    {userProfile?.email || '—'} · {isAdmin ? 'Administrador' : (userProfile?.role || 'Colaborador')}
                   </p>
                 </div>
                 <div className="hidden sm:flex flex-col items-end text-right">
