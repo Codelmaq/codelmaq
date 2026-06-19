@@ -71,8 +71,8 @@ export const mapLogToDB = (l: any) => ({
   combustivel_adicionado: ensureNumber(l.fuelAdded || l.combustivel_adicionado || l.fuel),
   fonte_combustivel: l.fuelSource || l.fonte_combustivel,
   observacoes: l.observations || l.observacoes,
-  aberto_em: l.openedAt || l.aberto_em,
-  fechado_em: l.closedAt || l.fechado_em
+  aberto_em: l.openedAt || l.aberto_em || l.horaInicio,
+  fechado_em: l.closedAt || l.fechado_em || l.horaFim || l.fechadoEm
 });
 
 export const mapDBToLog = (db: any) => ({

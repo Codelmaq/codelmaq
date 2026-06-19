@@ -281,6 +281,10 @@ export function OfflineFormPanel({
     }));
   }, [machines]);
 
+  // Previous shift data — auto-fills initial horimetro on the next start
+  const [previousHorimetro, setPreviousHorimetro] = useState<number | null>(null);
+  const [previousEndDate, setPreviousEndDate] = useState<string | null>(null);
+
   const handleScan = (code: string) => {
     setScannerOpen(false);
     setShiftCreationError(null);
@@ -288,10 +292,37 @@ export function OfflineFormPanel({
       setShiftCreationError('Já existe um turno em andamento. Encerre-o antes de iniciar outro.');
       return;
     }
+    const machineIdFromCode = code.replace(/^CODELMAQ-EQ-/, '');
     setScannedCode(code);
+    // Look up the most recent closed shift for this machine to pre-fill the initial horimetro
+    lookupLastShift(machineIdFromCode);
   };
 
-  const handleStartShift = async (data: { machineId: string; machineName?: string; horimetroInicial: number }) => {
+  const lookupLastShift = async (machineId: string) => {
+    try {
+      const records = await localDb.registrosDiarios
+        .where('machineId').equals(machineId)
+        .reverse()
+        .sortBy('data');
+      // Find the most recent closed record with a valid horimetroFinal
+      const closed = records
+        .filter((r) => r.status === 'fechado' && typeof r.horimetroFinal === 'number' && !isNaN(r.horimetroFinal))
+        .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+      if (closed.length > 0) {
+        setPreviousHorimetro(closed[0].horimetroFinal);
+        setPreviousEndDate(closed[0].data || null);
+      } else {
+        setPreviousHorimetro(null);
+        setPreviousEndDate(null);
+      }
+    } catch (e) {
+      console.warn('lookupLastShift failed:', e);
+      setPreviousHorimetro(null);
+      setPreviousEndDate(null);
+    }
+  };
+
+  const handleStartShift = async (data: { machineId: string; machineName?: string; horimetroInicial: number; horaInicio: string; previousHorimetro?: number }) => {
     try {
       if (!currentUserProfile?.id) {
         setShiftCreationError('Usuário não identificado. Faça login novamente.');
@@ -321,6 +352,8 @@ export function OfflineFormPanel({
         status: 'rascunho' as const,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        horaInicio: data.horaInicio,
+        horaFim: null as string | null,
         photos: [],
         synced: 0,
         syncFailed: 0,
@@ -342,6 +375,10 @@ export function OfflineFormPanel({
 
       // Pre-select the machine in the form
       setMachineId(data.machineId);
+
+      // Clear prefill state so the next scan re-queries fresh
+      setPreviousHorimetro(null);
+      setPreviousEndDate(null);
 
       setScannedCode(null);
     } catch (e) {
@@ -902,7 +939,13 @@ export function OfflineFormPanel({
         open={!!scannedCode}
         scannedCode={scannedCode}
         machineLookup={machineLookup}
-        onClose={() => setScannedCode(null)}
+        previousHorimetro={previousHorimetro}
+        previousEndDate={previousEndDate}
+        onClose={() => {
+          setScannedCode(null);
+          setPreviousHorimetro(null);
+          setPreviousEndDate(null);
+        }}
         onConfirm={handleStartShift}
       />
 

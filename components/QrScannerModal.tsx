@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Camera, X, ScanLine, Cpu, AlertTriangle } from 'lucide-react';
+import jsQR from 'jsqr';
 
 export interface QrScannerMockItem {
   code: string;
@@ -22,8 +23,8 @@ export interface QrScannerModalProps {
   onClose: () => void;
   title?: string;
   description?: string;
-  mockItems: QrScannerMockItem[];          // shown as "Gaveta de QRs" for offline testing
-  onScan: (code: string, payload: QrScannerMockItem['payload']) => void;
+  mockItems: QrScannerMockItem[];
+  onScan: (code: string, payload?: QrScannerMockItem['payload']) => void;
 }
 
 export function QrScannerModal({
@@ -37,14 +38,25 @@ export function QrScannerModal({
   const [isScanning, setIsScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [lastDecoded, setLastDecoded] = useState<string | null>(null);
+  const [scanLocked, setScanLocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const scanLockedRef = useRef(false);
 
   const stopCamera = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    scanLockedRef.current = false;
+    setScanLocked(false);
     setCameraActive(false);
   }, []);
 
@@ -58,15 +70,19 @@ export function QrScannerModal({
     const id = setTimeout(() => {
       setIsScanning(false);
       setCameraError(null);
+      setLastDecoded(null);
+      setScanLocked(false);
     }, 0);
     return () => clearTimeout(id);
   }, [open]);
 
   const startCamera = async () => {
     setCameraError(null);
+    scanLockedRef.current = false;
+    setScanLocked(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: { facingMode: { ideal: 'environment' } },
         audio: false,
       });
       streamRef.current = stream;
@@ -75,6 +91,48 @@ export function QrScannerModal({
         await videoRef.current.play();
       }
       setCameraActive(true);
+      setIsScanning(true);
+      const tick = () => {
+        if (!videoRef.current || !canvasRef.current) {
+          rafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+          rafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+        if (w && h) {
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, w, h);
+            const imageData = ctx.getImageData(0, 0, w, h);
+            const code = jsQR(imageData.data, w, h, { inversionAttempts: 'dontInvert' });
+            if (code && code.data && !scanLockedRef.current) {
+              scanLockedRef.current = true;
+              setScanLocked(true);
+              setIsScanning(true);
+              setLastDecoded(code.data);
+              const match = mockItems.find((m) => m.code === code.data);
+              const payload = match?.payload || { id: code.data, type: 'other' };
+              setTimeout(() => {
+                setIsScanning(false);
+                onScan(code.data, payload);
+              }, 800);
+              return;
+            }
+          }
+        }
+        if (!scanLockedRef.current) {
+          rafRef.current = requestAnimationFrame(tick);
+        }
+      };
+      rafRef.current = requestAnimationFrame(tick);
     } catch (err: any) {
       console.warn('Camera unavailable, use simulator below:', err);
       setCameraError(
@@ -84,8 +142,11 @@ export function QrScannerModal({
   };
 
   const handleMockScan = (item: QrScannerMockItem) => {
-    if (isScanning) return;
+    if (scanLockedRef.current) return;
+    scanLockedRef.current = true;
+    setScanLocked(true);
     setIsScanning(true);
+    setLastDecoded(item.code);
     setTimeout(() => {
       setIsScanning(false);
       onScan(item.code, item.payload);
@@ -111,7 +172,6 @@ export function QrScannerModal({
           className="bg-[#151515] border border-white/10 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div className="flex items-start justify-between p-5 border-b border-white/5">
             <div className="flex-1">
               <h3 className="text-base font-bold text-white font-heading uppercase flex items-center gap-2">
@@ -130,7 +190,6 @@ export function QrScannerModal({
           </div>
 
           <div className="p-5 space-y-5">
-            {/* Camera viewport */}
             <div className="relative aspect-video w-full rounded-2xl bg-black border border-white/10 overflow-hidden flex flex-col items-center justify-center">
               {cameraActive ? (
                 <video
@@ -156,17 +215,15 @@ export function QrScannerModal({
                 </div>
               )}
 
-              {/* Camera permission warning */}
-              {cameraError && cameraActive === false && null /* error is shown above */}
+              <canvas ref={canvasRef} className="hidden" />
 
-              {/* Laser scanning overlay */}
               <div className="absolute inset-0 pointer-events-none z-20 border-2 border-dashed border-[#eab308]/20 m-6 flex items-center justify-center">
                 <div className="w-[12%] h-[12%] border-t-2 border-l-2 border-[#eab308] absolute top-0 left-0"></div>
                 <div className="w-[12%] h-[12%] border-t-2 border-r-2 border-[#eab308] absolute top-0 right-0"></div>
                 <div className="w-[12%] h-[12%] border-b-2 border-l-2 border-[#eab308] absolute bottom-0 left-0"></div>
                 <div className="w-[12%] h-[12%] border-b-2 border-r-2 border-[#eab308] absolute bottom-0 right-0"></div>
 
-                {isScanning && (
+                {isScanning && cameraActive && (
                   <motion.div
                     initial={{ y: -80 }}
                     animate={{ y: 80 }}
@@ -179,7 +236,13 @@ export function QrScannerModal({
               {isScanning && (
                 <div className="absolute top-3 left-3 bg-black/70 border border-[#eab308]/30 text-[#eab308] text-[10px] px-2 py-1 rounded-md uppercase tracking-wider font-bold animate-pulse z-30 flex items-center gap-1">
                   <Cpu size={11} />
-                  Decodificando...
+                  {lastDecoded ? 'QR identificado' : 'Decodificando...'}
+                </div>
+              )}
+
+              {lastDecoded && scanLocked && (
+                <div className="absolute top-3 right-3 bg-emerald-500/90 border border-emerald-300/30 text-white text-[10px] px-2 py-1 rounded-md font-mono font-bold z-30">
+                  {lastDecoded}
                 </div>
               )}
 
@@ -191,7 +254,6 @@ export function QrScannerModal({
               )}
             </div>
 
-            {/* Mock QR list */}
             <div className="space-y-3">
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#9ca3af] flex items-center gap-1">
                 <Cpu className="h-4 w-4" />
@@ -206,7 +268,7 @@ export function QrScannerModal({
                     <button
                       key={item.code}
                       type="button"
-                      disabled={isScanning}
+                      disabled={scanLocked}
                       onClick={() => handleMockScan(item)}
                       className="p-3 rounded-2xl border text-left bg-black/30 hover:bg-black/50 hover:border-[#eab308]/40 transition-all cursor-pointer relative overflow-hidden group disabled:opacity-50 border-white/5"
                     >

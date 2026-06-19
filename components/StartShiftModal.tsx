@@ -2,40 +2,53 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Gauge, Truck, X, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Play, Gauge, Truck, X, AlertTriangle, ArrowRight, History, Clock } from 'lucide-react';
 
 export interface StartShiftPayload {
   machineId: string;
   machineName?: string;
   horimetroInicial: number;
+  horaInicio: string;       // ISO timestamp from device clock
+  previousHorimetro?: number;
 }
 
 interface StartShiftModalProps {
   open: boolean;
   scannedCode: string | null;       // raw QR code string (e.g. "CODELMAQ-EQ-CB-01")
   machineLookup: (id: string) => { id: string; name?: string; type?: string; plate?: string } | undefined;
+  previousHorimetro?: number | null;  // pre-fill from last shift's horimetroFinal
+  previousEndDate?: string | null;     // date string of the previous shift
   onClose: () => void;
   onConfirm: (data: StartShiftPayload) => Promise<void> | void;
 }
 
-export function StartShiftModal({ open, scannedCode, machineLookup, onClose, onConfirm }: StartShiftModalProps) {
+export function StartShiftModal({ open, scannedCode, machineLookup, previousHorimetro, previousEndDate, onClose, onConfirm }: StartShiftModalProps) {
   const [horimetroInicial, setHorimetroInicial] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [autoFilled, setAutoFilled] = useState(false);
 
   const machineId = scannedCode ? scannedCode.replace(/^CODELMAQ-EQ-/, '') : '';
   const machine = machineId ? machineLookup(machineId) : undefined;
 
   useEffect(() => {
     if (open) {
-      setHorimetroInicial('');
+      // Pre-fill from last shift's final horimetro
+      if (typeof previousHorimetro === 'number' && !isNaN(previousHorimetro)) {
+        setHorimetroInicial(String(previousHorimetro));
+        setAutoFilled(true);
+      } else {
+        setHorimetroInicial('');
+        setAutoFilled(false);
+      }
       setSubmitting(false);
     }
-  }, [open]);
+  }, [open, previousHorimetro]);
 
   if (!open || !scannedCode) return null;
 
   const num = parseFloat(horimetroInicial || '0');
   const isValid = !isNaN(num) && num >= 0;
+  const horaInicio = new Date().toISOString();
 
   const handleSubmit = async () => {
     if (!isValid || !machineId) return;
@@ -45,6 +58,8 @@ export function StartShiftModal({ open, scannedCode, machineLookup, onClose, onC
         machineId,
         machineName: machine?.name,
         horimetroInicial: num,
+        horaInicio,
+        previousHorimetro: typeof previousHorimetro === 'number' ? previousHorimetro : undefined,
       });
     } finally {
       setSubmitting(false);
@@ -88,7 +103,6 @@ export function StartShiftModal({ open, scannedCode, machineLookup, onClose, onC
           </div>
 
           <div className="p-5 space-y-4">
-            {/* Machine preview */}
             {machine ? (
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">
@@ -111,15 +125,25 @@ export function StartShiftModal({ open, scannedCode, machineLookup, onClose, onC
               </div>
             )}
 
-            {/* Entry time (read-only) */}
             <div className="flex flex-col space-y-1.5">
-              <label className="text-[10px] text-gray-700 dark:text-gray-300 uppercase font-bold tracking-wider">Horário de Entrada (automático)</label>
+              <label className="text-[10px] text-gray-700 dark:text-gray-300 uppercase font-bold tracking-wider flex items-center gap-1">
+                <Clock size={11} /> Horário de Entrada (automático)
+              </label>
               <div className="w-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/5 rounded-xl p-2.5 text-sm text-gray-700 dark:text-gray-200 font-mono">
                 {new Date().toLocaleString('pt-BR')}
               </div>
             </div>
 
-            {/* Horimetro inicial (required) */}
+            {typeof previousHorimetro === 'number' && !isNaN(previousHorimetro) && (
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2 text-amber-800 dark:text-amber-300 text-xs">
+                <History size={13} className="flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong>Pré-preenchido</strong> com o horímetro final do turno anterior
+                  {previousEndDate ? ` (${previousEndDate})` : ''}: <span className="font-mono font-bold">{previousHorimetro}</span>. Confira no painel da máquina e ajuste se necessário.
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col space-y-1.5">
               <label className="text-[10px] text-gray-700 dark:text-gray-300 uppercase font-bold tracking-wider flex items-center gap-1">
                 <Gauge size={11} /> Horímetro / KM Inicial <span className="text-red-500">*</span>
@@ -131,12 +155,17 @@ export function StartShiftModal({ open, scannedCode, machineLookup, onClose, onC
                 required
                 autoFocus
                 value={horimetroInicial}
-                onChange={(e) => setHorimetroInicial(e.target.value)}
+                onChange={(e) => {
+                  setHorimetroInicial(e.target.value);
+                  setAutoFilled(false);
+                }}
                 placeholder="Ex: 1450"
                 className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-sm text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
               />
               <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                Anote o horímetro que está marcando agora no painel da máquina.
+                {autoFilled
+                  ? 'Campo preenchido automaticamente. Confirme o valor no painel da máquina.'
+                  : 'Anote o horímetro que está marcando agora no painel da máquina.'}
               </p>
             </div>
 

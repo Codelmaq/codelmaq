@@ -105,11 +105,14 @@ export function ActiveShiftBanner() {
         onConfirm={async (data) => {
           try {
             // Persist the closed registro_diario in IndexedDB so it gets synced later.
+            const horaFim = new Date().toISOString();
             await localDb.registrosDiarios.update(activeShift.id, {
               horimetroFinal: data.horimetroFinal,
               fuelAdded: data.fuelAdded,
               observations: data.observations || '',
               status: 'fechado',
+              horaFim: horaFim,
+              fechadoEm: horaFim,
               synced: 0,
             });
             // Recalculate pending count + try a sync attempt right now.
