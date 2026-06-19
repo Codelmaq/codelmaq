@@ -701,6 +701,7 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
   const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
   const [editModal, setEditModal] = useState({ isOpen: false, data: null as any });
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, id: '' });
+  const [refillError, setRefillError] = useState<string | null>(null);
   const capacity = 5000;
   const percentage = (stock / capacity) * 100;
 
@@ -741,10 +742,27 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
 
   const handleMachineRefillSubmit = (e: any) => {
     e.preventDefault();
+    if (stock <= 0) {
+      setRefillError('Estoque do caminhão zerado. Abasteça o caminhão antes de debitar para um equipamento.');
+      return;
+    }
     const formData = new FormData(e.target);
     const amount = Number(formData.get('amount'));
     const machineId = formData.get('machineId');
     const date = formData.get('date');
+
+    if (!machineId) {
+      setRefillError('Selecione um equipamento.');
+      return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+      setRefillError('A quantidade deve ser maior que zero.');
+      return;
+    }
+    if (amount > stock) {
+      setRefillError(`Estoque insuficiente: ${stock}L disponíveis no caminhão.`);
+      return;
+    }
 
     onMachineRefill({
       id: `DEB-${genId().split('-')[0]}`,
@@ -753,6 +771,7 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
       machineId,
       type: 'Débito'
     });
+    setRefillError(null);
     setIsMachineRefillModalOpen(false);
   };
 
@@ -803,7 +822,10 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
             </button>
           )}
           <button 
-            onClick={() => setIsMachineRefillModalOpen(true)}
+            onClick={() => {
+              setIsMachineRefillModalOpen(true);
+              setRefillError(null);
+            }}
             className="bg-black dark:bg-neutral-800 hover:bg-neutral-800 dark:hover:bg-neutral-700 text-white px-4 py-2 rounded-lg flex items-center justify-center shadow-sm transition-all text-sm"
           >
             <Truck size={20} className="mr-2" />
@@ -1076,15 +1098,19 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
                 <Truck className="mr-2 text-blue-600" />
                 Abastecimento de Equipamento
               </h3>
-              <button onClick={() => setIsMachineRefillModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:text-gray-300">
+              <button onClick={() => { setIsMachineRefillModalOpen(false); setRefillError(null); }} className="text-gray-400 hover:text-gray-600 dark:text-gray-300">
                 <X size={24} />
               </button>
             </div>
-            
+
             <form className="space-y-4" onSubmit={handleMachineRefillSubmit}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Equipamento</label>
-                <select name="machineId" required className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500">
+                <select
+                  name="machineId"
+                  required
+                  className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500"
+                >
                   <option value="">Selecione um equipamento...</option>
                   {machines.map((m: any) => (
                     <option key={m.id} value={m.id}>{m.id} - {m.model} ({m.type})</option>
@@ -1093,15 +1119,57 @@ export const FuelTruckView = ({ stock, refills, onRefill, onEditRefill, onDelete
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Data/Hora</label>
-                <input name="date" required type="datetime-local" defaultValue={new Date().toISOString().slice(0, 16)} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500" />
+                <input
+                  name="date"
+                  required
+                  type="datetime-local"
+                  defaultValue={new Date().toISOString().slice(0, 16)}
+                  className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Quantidade (Litros)</label>
-                <input name="amount" required type="number" min="1" max={stock} placeholder={`Disponível: ${stock}L`} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500" />
+                <input
+                  name="amount"
+                  required
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="Ex: 50"
+                  onInput={(e: any) => {
+                    const v = Number(e.target.value || 0);
+                    setRefillError(v > stock && stock > 0 ? `Estoque insuficiente: ${stock}L disponíveis no caminhão.` : null);
+                  }}
+                  className={`w-full p-2 border rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-blue-500 focus:border-blue-500 ${refillError ? 'border-red-500' : 'border-gray-300 dark:border-zinc-700'}`}
+                />
+                {refillError && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">{refillError}</p>
+                )}
               </div>
+
+              <div className={`p-3 rounded-lg border-2 ${stock <= 0 ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700/50' : 'bg-blue-50 border-blue-300 dark:bg-blue-900/20 dark:border-blue-700/50'}`}>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-bold text-gray-700 dark:text-gray-200">Disponível no Caminhão:</span>
+                  <span className={`font-black text-base ${stock <= 0 ? 'text-red-700 dark:text-red-300' : 'text-blue-700 dark:text-blue-300'}`}>
+                    {stock.toLocaleString('pt-BR')}L
+                  </span>
+                </div>
+                {stock <= 0 && (
+                  <p className="text-xs text-red-700 dark:text-red-300 mt-2 font-medium">
+                    ⚠️ Estoque zerado. Abasteça o caminhão primeiro (botão &ldquo;Abastecer Caminhão&rdquo; acima) antes de debitar para um equipamento.
+                  </p>
+                )}
+              </div>
+
               <div className="pt-4 flex justify-end gap-2 border-t mt-6">
-                <button type="button" onClick={() => setIsMachineRefillModalOpen(false)} className="px-4 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#1e1e1e] rounded-md hover:bg-gray-200">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 shadow-sm">Confirmar Abastecimento</button>
+                <button type="button" onClick={() => { setIsMachineRefillModalOpen(false); setRefillError(null); }} className="px-4 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#1e1e1e] rounded-md hover:bg-gray-200">Cancelar</button>
+                <button
+                  type="submit"
+                  disabled={stock <= 0}
+                  className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Confirmar Abastecimento
+                </button>
               </div>
             </form>
           </div>
