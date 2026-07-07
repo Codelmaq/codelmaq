@@ -1,5 +1,5 @@
-import { mapDBToMachine, mapMachineToDB, mapDBToLog, mapLogToDB, mapDBToRefill, mapRefillToDB, mapDBToPlan, mapPlanToDB, mapDBToMaintenances, mapMaintenancesToDB, mapDBToEmployee, mapEmployeeToDB, mapSiteToDB, mapDBToSite, mapDBToTemplate, mapTemplateToDB, mapChecklistToDB, mapDBToChecklist } from '@/lib/mapper';
-import { localDb, LocalChecklist, LocalRegistroDiario, LocalUser } from './localDb';
+import { mapDBToMachine, mapMachineToDB, mapDBToLog, mapLogToDB, mapDBToRefill, mapRefillToDB, mapDBToPlan, mapPlanToDB, mapDBToMaintenances, mapMaintenancesToDB, mapDBToEmployee, mapEmployeeToDB, mapSiteToDB, mapDBToSite, mapDBToTemplate, mapTemplateToDB, mapChecklistToDB, mapDBToChecklist, mapBonusToDB, mapDBToBonus, mapPenaltyToDB, mapDBToPenalty } from '@/lib/mapper';
+import { localDb, LocalChecklist, LocalRegistroDiario, LocalUser, LocalBonus, LocalPenalty } from './localDb';
 import { supabase } from './supabase';
 import { connectivityService } from './connectivity';
 import { genId } from '@/lib/utils';
@@ -85,8 +85,10 @@ class CodelmaqSyncEngine {
       const unsyncedUsers = await localDb.users.where('synced').equals(0).count();
       const unsyncedChecklists = await localDb.checklists.where('synced').equals(0).count();
       const unsyncedRegs = await localDb.registrosDiarios.where('synced').equals(0).count();
-      
-      const total = unsyncedUsers + unsyncedChecklists + unsyncedRegs;
+      const unsyncedBonuses = await localDb.bonuses.where('synced').equals(0).count();
+      const unsyncedPenalties = await localDb.penalties.where('synced').equals(0).count();
+
+      const total = unsyncedUsers + unsyncedChecklists + unsyncedRegs + unsyncedBonuses + unsyncedPenalties;
       this.status.totalPending = total;
       this.notifyAll();
       return total;
@@ -423,6 +425,249 @@ class CodelmaqSyncEngine {
           this.status.errors.push({
             table: 'registros_diarios',
             id: localReg.id,
+            message: errMsg
+          });
+          this.notifyAll();
+        }
+      }
+
+      // 4. Sync Bonuses (Programa de Excelencia — bonificacoes / pontos positivos)
+      const pendingBonuses = await localDb.bonuses.where('synced').equals(0).toArray();
+
+      // Pre-flight: detect missing FK targets (operador + aplicado_por) in batched SELECTs.
+      if (pendingBonuses.length > 0) {
+        const bonusOperatorIds = pendingBonuses.map((b) => b.operatorId);
+        const bonusAplicadoPorIds = pendingBonuses.map((b) => b.aplicadoPor);
+
+        const [operatorCheck, aplicadoPorCheck] = await Promise.all([
+          this.verifyReferencesExist('funcionarios', bonusOperatorIds),
+          this.verifyReferencesExist('funcionarios', bonusAplicadoPorIds)
+        ]);
+
+        const missingOperators = new Set(operatorCheck.missing);
+        const missingAplicadoPor = new Set(aplicadoPorCheck.missing);
+        const blockedIds = new Set<string>();
+        const failureReasons = new Map<string, string>();
+
+        for (const bonus of pendingBonuses) {
+          if (missingOperators.has(bonus.operatorId)) {
+            failureReasons.set(
+              bonus.id,
+              `Colaborador "${bonus.operatorId}" não existe no servidor. Cadastre o funcionário ou descarte este registro.`
+            );
+            blockedIds.add(bonus.id);
+          } else if (bonus.aplicadoPor && missingAplicadoPor.has(bonus.aplicadoPor)) {
+            failureReasons.set(
+              bonus.id,
+              `Admin que creditou "${bonus.aplicadoPor}" não existe no servidor.`
+            );
+            blockedIds.add(bonus.id);
+          }
+        }
+
+        for (const [id, msg] of failureReasons) {
+          await localDb.bonuses.update(id, { sync_failed: 1, sync_error: msg });
+          this.status.errors.push({ table: 'bonificacoes', id, message: msg });
+          this.notifyAll();
+        }
+
+        var syncableBonuses = pendingBonuses.filter((b) => !blockedIds.has(b.id));
+      } else {
+        var syncableBonuses: typeof pendingBonuses = [];
+      }
+
+      for (const localBonus of syncableBonuses) {
+        try {
+          // Auto-heal invalid UUIDs
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(localBonus.id);
+          let finalPayload = mapBonusToDB(localBonus);
+          let workingId = localBonus.id;
+
+          if (!isUuid) {
+            console.warn(`Healing invalid UUID for bonus: ${localBonus.id}`);
+            const newId = genId();
+            finalPayload.id = newId;
+            workingId = newId;
+            await localDb.bonuses.update(localBonus.id, { id: newId });
+          }
+
+          const { error } = await supabase
+            .from('bonificacoes')
+            .upsert(finalPayload);
+
+          if (error) {
+            if (error.code === '23503') {
+              console.error(`FK violation for bonus ${workingId}: ${error.details}`);
+              const detail = (error.details || '').toLowerCase();
+              let errMsg: string;
+              if (detail.includes('funcionarios')) {
+                errMsg = `Colaborador "${localBonus.operatorId}" não existe no servidor. Cadastre o funcionário ou descarte este registro.`;
+              } else {
+                errMsg = `Violação de chave estrangeira: ${error.details || error.message}. Revise o registro na Fila Local.`;
+              }
+              await localDb.bonuses.update(workingId, { sync_failed: 1, sync_error: errMsg });
+              this.status.errors.push({
+                table: 'bonificacoes',
+                id: workingId,
+                message: errMsg
+              });
+              this.notifyAll();
+              continue;
+            }
+
+            if (error.code === '22P02') {
+              const errMsg = `Dados inválidos detectados na bonificação. Revise os pontos e tente novamente.`;
+              await localDb.bonuses.update(workingId, { sync_failed: 1, sync_error: errMsg });
+              this.status.errors.push({
+                table: 'bonificacoes',
+                id: workingId,
+                message: errMsg
+              });
+              this.notifyAll();
+              continue;
+            }
+
+            throw error;
+          }
+
+          await localDb.bonuses.update(workingId, { synced: 1, sync_failed: 0, sync_error: undefined });
+          this.status.syncedCount++;
+          this.notifyAll();
+        } catch (err: any) {
+          console.error(`Erro ao sincronizar bonificação ${localBonus.id}:`, err);
+          const errMsg = err.message || 'Erro durante a sincronização de bonificação';
+          await localDb.bonuses.update(localBonus.id, { sync_failed: 1, sync_error: errMsg });
+          this.status.errors.push({
+            table: 'bonificacoes',
+            id: localBonus.id,
+            message: errMsg
+          });
+          this.notifyAll();
+        }
+      }
+
+      // 5. Sync Penalties (Programa de Excelencia — débitos / infrações)
+      const pendingPenalties = await localDb.penalties.where('synced').equals(0).toArray();
+
+      // Pre-flight: detect missing FK targets (operador + aplicado_por) in batched SELECTs.
+      if (pendingPenalties.length > 0) {
+        const penaltyOperatorIds = pendingPenalties.map((p) => p.operatorId);
+        const penaltyAplicadoPorIds = pendingPenalties.map((p) => p.aplicadoPor);
+
+        const [operatorCheck, aplicadoPorCheck] = await Promise.all([
+          this.verifyReferencesExist('funcionarios', penaltyOperatorIds),
+          this.verifyReferencesExist('funcionarios', penaltyAplicadoPorIds)
+        ]);
+
+        const missingOperators = new Set(operatorCheck.missing);
+        const missingAplicadoPor = new Set(aplicadoPorCheck.missing);
+        const blockedIds = new Set<string>();
+        const failureReasons = new Map<string, string>();
+
+        for (const penalty of pendingPenalties) {
+          if (missingOperators.has(penalty.operatorId)) {
+            failureReasons.set(
+              penalty.id,
+              `Colaborador "${penalty.operatorId}" não existe no servidor. Cadastre o funcionário ou descarte este registro.`
+            );
+            blockedIds.add(penalty.id);
+          } else if (penalty.aplicadoPor && missingAplicadoPor.has(penalty.aplicadoPor)) {
+            failureReasons.set(
+              penalty.id,
+              `Admin que aplicou "${penalty.aplicadoPor}" não existe no servidor.`
+            );
+            blockedIds.add(penalty.id);
+          }
+        }
+
+        for (const [id, msg] of failureReasons) {
+          await localDb.penalties.update(id, { sync_failed: 1, sync_error: msg });
+          this.status.errors.push({ table: 'penalidades', id, message: msg });
+          this.notifyAll();
+        }
+
+        var syncablePenalties = pendingPenalties.filter((p) => !blockedIds.has(p.id));
+      } else {
+        var syncablePenalties: typeof pendingPenalties = [];
+      }
+
+      for (const localPenalty of syncablePenalties) {
+        try {
+          // Auto-heal invalid UUIDs
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(localPenalty.id);
+          let finalPayload = mapPenaltyToDB(localPenalty);
+          let workingId = localPenalty.id;
+
+          if (!isUuid) {
+            console.warn(`Healing invalid UUID for penalty: ${localPenalty.id}`);
+            const newId = genId();
+            finalPayload.id = newId;
+            workingId = newId;
+            await localDb.penalties.update(localPenalty.id, { id: newId });
+          }
+
+          const { error } = await supabase
+            .from('penalidades')
+            .upsert(finalPayload);
+
+          if (error) {
+            if (error.code === '23503') {
+              console.error(`FK violation for penalty ${workingId}: ${error.details}`);
+              const detail = (error.details || '').toLowerCase();
+              let errMsg: string;
+              if (detail.includes('funcionarios')) {
+                errMsg = `Colaborador "${localPenalty.operatorId}" não existe no servidor. Cadastre o funcionário ou descarte este registro.`;
+              } else {
+                errMsg = `Violação de chave estrangeira: ${error.details || error.message}. Revise o registro na Fila Local.`;
+              }
+              await localDb.penalties.update(workingId, { sync_failed: 1, sync_error: errMsg });
+              this.status.errors.push({
+                table: 'penalidades',
+                id: workingId,
+                message: errMsg
+              });
+              this.notifyAll();
+              continue;
+            }
+
+            if (error.code === '22P02') {
+              const errMsg = `Dados inválidos detectados na penalidade. Revise os pontos e tente novamente.`;
+              await localDb.penalties.update(workingId, { sync_failed: 1, sync_error: errMsg });
+              this.status.errors.push({
+                table: 'penalidades',
+                id: workingId,
+                message: errMsg
+              });
+              this.notifyAll();
+              continue;
+            }
+
+            // CHECK constraint violation (23514) — pontos > 0 não permitido
+            if (error.code === '23514') {
+              const errMsg = `Pontos da penalidade devem ser <= 0. Ajuste o registro na Fila Local.`;
+              await localDb.penalties.update(workingId, { sync_failed: 1, sync_error: errMsg });
+              this.status.errors.push({
+                table: 'penalidades',
+                id: workingId,
+                message: errMsg
+              });
+              this.notifyAll();
+              continue;
+            }
+
+            throw error;
+          }
+
+          await localDb.penalties.update(workingId, { synced: 1, sync_failed: 0, sync_error: undefined });
+          this.status.syncedCount++;
+          this.notifyAll();
+        } catch (err: any) {
+          console.error(`Erro ao sincronizar penalidade ${localPenalty.id}:`, err);
+          const errMsg = err.message || 'Erro durante a sincronização de penalidade';
+          await localDb.penalties.update(localPenalty.id, { sync_failed: 1, sync_error: errMsg });
+          this.status.errors.push({
+            table: 'penalidades',
+            id: localPenalty.id,
             message: errMsg
           });
           this.notifyAll();

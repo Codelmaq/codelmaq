@@ -6,7 +6,7 @@ import { Square, Gauge, Fuel, FileText, X, AlertTriangle } from 'lucide-react';
 import { useShiftStore } from '@/store/shiftStore';
 import { localDb } from '@/lib/localDb';
 import { syncEngine } from '@/lib/syncEngine';
-import { genId } from '@/lib/utils';
+import { genId, parseDecimal } from '@/lib/utils';
 
 interface EndShiftModalProps {
   open: boolean;
@@ -33,8 +33,9 @@ export function EndShiftModal({ open, onClose, onConfirm }: EndShiftModalProps) 
   if (!open || !activeShift) return null;
 
   const initial = activeShift.horimetroInicial;
-  const finalNum = parseFloat(horimetroFinal || '0');
-  const isValid = !isNaN(finalNum) && finalNum >= initial;
+  // Accepts both "30,5" and "30.5" — type=number would strip the comma in pt-BR.
+  const finalNum = parseDecimal(horimetroFinal);
+  const isValid = Number.isFinite(finalNum) && finalNum >= initial;
 
   const handleSubmit = async () => {
     if (!isValid) return;
@@ -42,7 +43,7 @@ export function EndShiftModal({ open, onClose, onConfirm }: EndShiftModalProps) 
     try {
       await onConfirm({
         horimetroFinal: finalNum,
-        fuelAdded: parseFloat(fuelAdded || '0'),
+        fuelAdded: parseDecimal(fuelAdded || 0),
         observations: observations.trim(),
       });
     } finally {
@@ -104,12 +105,17 @@ export function EndShiftModal({ open, onClose, onConfirm }: EndShiftModalProps) 
                 <Gauge size={11} /> Horímetro / KM Final <span className="text-red-500">*</span>
               </label>
               <input
-                type="number"
-                step="0.1"
+                type="text"
+                inputMode="decimal"
                 required
                 autoFocus
                 value={horimetroFinal}
-                onChange={(e) => setHorimetroFinal(e.target.value)}
+                onChange={(e) => {
+                  // Strip anything that isn't a digit, comma, period or minus —
+                  // keeps the field clean while letting pt-BR users type "30,5".
+                  const cleaned = e.target.value.replace(/[^\d.,-]/g, '');
+                  setHorimetroFinal(cleaned);
+                }}
                 placeholder={`Maior ou igual a ${initial}`}
                 className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-sm text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
               />
@@ -127,11 +133,13 @@ export function EndShiftModal({ open, onClose, onConfirm }: EndShiftModalProps) 
                 <Fuel size={11} /> Combustível Abastecido (L)
               </label>
               <input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={fuelAdded}
-                onChange={(e) => setFuelAdded(e.target.value)}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/[^\d.,-]/g, '');
+                  setFuelAdded(cleaned);
+                }}
                 placeholder="0"
                 className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-white/10 rounded-xl p-2.5 text-sm text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono"
               />

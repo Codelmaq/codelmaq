@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Gauge, Truck, X, AlertTriangle, ArrowRight, History, Clock } from 'lucide-react';
+import { parseDecimal } from '@/lib/utils';
 
 export interface StartShiftPayload {
   machineId: string;
@@ -46,8 +47,8 @@ export function StartShiftModal({ open, scannedCode, machineLookup, previousHori
 
   if (!open || !scannedCode) return null;
 
-  const num = parseFloat(horimetroInicial || '0');
-  const isValid = !isNaN(num) && num >= 0;
+  const num = parseDecimal(horimetroInicial);
+  const isValid = Number.isFinite(num) && num >= 0;
   const horaInicio = new Date().toISOString();
 
   const handleSubmit = async () => {
@@ -149,14 +150,15 @@ export function StartShiftModal({ open, scannedCode, machineLookup, previousHori
                 <Gauge size={11} /> Horímetro / KM Inicial <span className="text-red-500">*</span>
               </label>
               <input
-                type="number"
-                step="0.1"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 required
                 autoFocus
                 value={horimetroInicial}
                 onChange={(e) => {
-                  setHorimetroInicial(e.target.value);
+                  // Allow digits, comma and period so pt-BR "30,5" works.
+                  const cleaned = e.target.value.replace(/[^\d.,-]/g, '');
+                  setHorimetroInicial(cleaned);
                   setAutoFilled(false);
                 }}
                 placeholder="Ex: 1450"

@@ -3,14 +3,16 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import FleetManager from '@/components/FleetManager';
 import LoginPage from '@/app/login/page';
 import AguardandoAprovacaoPage from '@/app/aguardando-aprovacao/page';
+import { ShiftFeedbackProvider } from '@/components/ShiftFeedbackProvider';
 
 // -----------------------------------------
 // App Routes Configuration
 // -----------------------------------------
 export default function App() {
   return (
-    <HashRouter>
-      <Routes>
+    <ShiftFeedbackProvider>
+      <HashRouter>
+        <Routes>
         {/* Redirect Root to Dashboard */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         
@@ -37,5 +39,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </HashRouter>
+    </ShiftFeedbackProvider>
   );
 }

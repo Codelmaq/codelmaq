@@ -56,3 +56,53 @@ export function safeTimeOf(value: unknown): number {
   return d ? d.getTime() : 0
 }
 
+/**
+ * Parse a decimal number from a string that may use either a period or a
+ * comma as the decimal separator. Returns NaN for empty / invalid input.
+ *
+ * Why this exists: <input type="number"> ignores commas in pt-BR locales, and
+ * parseFloat("30,5") returns 30 (stops at the comma). Operators in the field
+ * type "30,5" naturally, so we normalize before parsing.
+ *
+ * Handles the common cases:
+ *   parseDecimal('30,5')     => 30.5
+ *   parseDecimal('30.5')     => 30.5
+ *   parseDecimal(' 40,5 ')   => 40.5
+ *   parseDecimal('1.234,56') => 1234.56  (BR thousands + decimal)
+ *   parseDecimal('1,234.56') => 1234.56  (EN thousands + decimal)
+ *   parseDecimal('')          => NaN
+ *   parseDecimal('abc')       => NaN
+ *   parseDecimal(42)          => 42
+ */
+export function parseDecimal(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
+  if (value === null || value === undefined) return NaN
+  const raw = String(value).trim()
+  if (!raw) return NaN
+
+  // Strip internal whitespace, then normalize the decimal separator to '.'.
+  let normalized = raw.replace(/\s+/g, '').replace(/,/g, '.')
+
+  // If we ended up with more than one dot, treat the last one as the decimal
+  // separator and the rest as thousands grouping. Covers "1.234,56" and
+  // "1,234.56" and "1.234.567" (without a decimal) — we just collapse.
+  const dotCount = (normalized.match(/\./g) || []).length
+  if (dotCount > 1) {
+    const lastDot = normalized.lastIndexOf('.')
+    const intPart = normalized.slice(0, lastDot).replace(/\./g, '')
+    const decPart = normalized.slice(lastDot + 1)
+    normalized = `${intPart}.${decPart}`
+  }
+
+  const n = Number(normalized)
+  return Number.isFinite(n) ? n : NaN
+}
+
+/**
+ * True when the string represents a parseable decimal number. Useful for
+ * early-return validation in forms (e.g. "show error if not isDecimal(...)").
+ */
+export function isDecimal(value: unknown): boolean {
+  return Number.isFinite(parseDecimal(value))
+}
+
