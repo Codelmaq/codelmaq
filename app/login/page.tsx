@@ -15,7 +15,6 @@ import {
   Sun, 
   Moon, 
   QrCode, 
-  HelpCircle,
   CheckCircle2, 
   XCircle,
   Sparkles,
@@ -26,7 +25,9 @@ import {
   Briefcase,
   Truck,
   Wrench,
-  HardHat
+  HardHat,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -148,6 +149,9 @@ export default function LoginPage() {
   // Inputs
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [nome, setNome] = useState('');
   const [role, setRole] = useState<UserRole>('operador');
@@ -429,7 +433,20 @@ export default function LoginPage() {
           }
         }
       } else {
-        // Sign Up Flow
+        // Sign Up Flow — validações reforçadas antes de chamar Supabase
+        if (nome.trim().length < 3) {
+          setError('Informe seu nome completo (mínimo 3 caracteres).');
+          setLoading(false);
+          playBeep('error');
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('As senhas não coincidem. Verifique a confirmação.');
+          setLoading(false);
+          playBeep('error');
+          return;
+        }
+
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -437,7 +454,8 @@ export default function LoginPage() {
             data: {
               nome,
               role,
-            }
+            },
+            emailRedirectTo: `${window.location.origin}/login`,
           }
         });
 
@@ -449,11 +467,13 @@ export default function LoginPage() {
         }
 
         if (data.user) {
+          // ATENÇÃO: a tabela `funcionarios` não tem coluna `role` — só `funcao`.
+          // Enviar `role` causa erro 42703 (column not found) e o insert falha silenciosamente,
+          // fazendo o cadastro sumir da lista de pendentes.
           const profileData = {
             id: data.user.id,
             nome,
             funcao: role,
-            role,
             status: 'pendente' as const,
             email: email
           };
@@ -464,13 +484,26 @@ export default function LoginPage() {
 
           if (insertError) {
             console.error('Database user mapping error:', insertError);
+            // IMPORTANTE: mostrar o erro ao usuário em vez de engolir silenciosamente.
+            setError(
+              `Conta criada no Auth, mas falhou ao registrar perfil em ` +
+              `funcionarios: ${insertError.message || insertError.code || 'erro desconhecido'}. ` +
+              `Contate o administrador.`
+            );
+            setLoading(false);
+            playBeep('error');
+            return;
           }
 
-          setSuccessMessage(`Sua conta foi submetida como ${ROLE_LABELS[role]}! Aguarde a aprovação de um Administrador.`);
+          setSuccessMessage(
+            `Conta criada como ${ROLE_LABELS[role]}! ` +
+            `Verifique seu e-mail para confirmar o cadastro e aguarde a aprovação de um Administrador.`
+          );
           setIsLogin(true);
-          playBeep('double');
           setEmail('');
           setPassword('');
+          setConfirmPassword('');
+          playBeep('double');
         }
       }
     } catch (err: any) {
@@ -925,13 +958,22 @@ export default function LoginPage() {
                             <Lock className="h-4 w-4" />
                           </span>
                           <input
-                            type="password"
+                            type={showPassword ? 'text' : 'password'}
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-sm focus:border-[#eab308] focus:ring-1 focus:ring-[#eab308] outline-none transition-all light:bg-[#f5f4ff] light:border-transparent light:text-black light:focus:bg-white dark:bg-[#151515]"
+                            className="w-full pl-10 pr-12 py-3 bg-black/20 border border-white/10 rounded-xl text-sm focus:border-[#eab308] focus:ring-1 focus:ring-[#eab308] outline-none transition-all light:bg-[#f5f4ff] light:border-transparent light:text-black light:focus:bg-white dark:bg-[#151515]"
                             placeholder="••••••••"
                           />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#9ca3af] hover:text-[#eab308] transition-colors cursor-pointer"
+                            title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                            aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
                         </div>
 
                         {/* Live password verification feedback */}
@@ -952,6 +994,49 @@ export default function LoginPage() {
                                 <span className={pwdRules.hasNumber ? 'text-emerald-400 font-medium' : 'text-[#9ca3af]'}>Possui número</span>
                               </div>
                             </div>
+                          </div>
+                        )}
+
+                        {/* Confirmar senha (apenas no cadastro) */}
+                        {!isLogin && (
+                          <div className="space-y-1 mt-3">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-[#9ca3af]">
+                              Confirmar Senha
+                            </label>
+                            <div className="relative">
+                              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-[#9ca3af]">
+                                <Lock className="h-4 w-4" />
+                              </span>
+                              <input
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                required
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className="w-full pl-10 pr-12 py-3 bg-black/20 border border-white/10 rounded-xl text-sm focus:border-[#eab308] focus:ring-1 focus:ring-[#eab308] outline-none transition-all light:bg-[#f5f4ff] light:border-transparent light:text-black light:focus:bg-white dark:bg-[#151515]"
+                                placeholder="Repita a senha"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#9ca3af] hover:text-[#eab308] transition-colors cursor-pointer"
+                                title={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                              >
+                                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
+                            {confirmPassword.length > 0 && password !== confirmPassword && (
+                              <p className="text-[10px] text-red-400 font-medium flex items-center gap-1">
+                                <XCircle className="h-3 w-3" />
+                                As senhas não coincidem
+                              </p>
+                            )}
+                            {confirmPassword.length > 0 && password === confirmPassword && (
+                              <p className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Senhas conferem
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1046,41 +1131,6 @@ export default function LoginPage() {
                       </button>
                     )}
                   </div>
-
-                  {/* Developer Quick-Login Hint Card */}
-                  {isLogin && !isForgotPassword && !isUpdatingPassword && (
-                    <div className="p-4 rounded-2xl bg-white dark:bg-[#151515]/5 border border-white/10 space-y-3 light:bg-[#f5f4ff] light:border-transparent">
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-[#eab308] light:text-[#eab308]">
-                        <HelpCircle className="h-3.5 w-3.5" />
-                        Acesso de Desenvolvimento Rápido
-                      </div>
-                      <p className="text-[11px] text-[#9ca3af] light:text-[#6b7280]">
-                        Utilize os botões abaixo para preencher instantaneamente as credenciais de bypass padrão:
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => {
-                            setEmail('admin@codelmaq.com.br');
-                            setPassword('123456');
-                            playBeep('success');
-                          }}
-                          className="py-1.5 px-3 rounded-lg bg-black/40 border border-white/5 hover:border-[#eab308]/30 hover:bg-[#eab308]/10 text-[10px] text-white font-bold transition-all cursor-pointer light:bg-white dark:bg-[#151515] light:border-[#eab308]/20 light:text-[#eab308]"
-                        >
-                          E-mail Admin
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEmail('operador@codelmaq.com.br');
-                            setPassword('123456');
-                            playBeep('success');
-                          }}
-                          className="py-1.5 px-3 rounded-lg bg-black/40 border border-white/5 hover:border-[#eab308]/30 hover:bg-[#eab308]/10 text-[10px] text-white font-bold transition-all cursor-pointer light:bg-white dark:bg-[#151515] light:border-[#eab308]/20 light:text-[#eab308]"
-                        >
-                          E-mail Operador
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </motion.div>
             )}
