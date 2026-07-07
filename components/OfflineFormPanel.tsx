@@ -1,28 +1,38 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  ClipboardList, 
-  Gauge, 
-  Camera, 
-  Trash2, 
-  CheckCircle, 
-  AlertTriangle, 
-  FileText, 
-  Fuel, 
+import {
+  ClipboardList,
+  Gauge,
+  Camera,
+  Trash2,
+  CheckCircle,
+  AlertTriangle,
+  FileText,
+  Fuel,
   MapPin,
   Loader2,
   Database,
   RefreshCw,
-  QrCode
+  QrCode,
+  Play,
+  Square,
+  Clock,
 } from 'lucide-react';
 import { localDb } from '@/lib/localDb';
 import { syncEngine, SyncStatusReport } from '@/lib/syncEngine';
 import { compressImage } from '@/lib/imageCompression';
-import { genId } from '@/lib/utils';
+import { genId, parseDecimal } from '@/lib/utils';
 import { useShiftStore } from '@/store/shiftStore';
 import { QrScannerModal, QrScannerMockItem } from './QrScannerModal';
 import { StartShiftModal } from './StartShiftModal';
+import { useShiftFeedback } from './ShiftFeedbackProvider';
+import { playError, unlockAudio } from '@/lib/audioFeedback';
+import { useClockGuard } from './ClockGuard';
+import {
+  trustedDayString as trustedDayStringImport,
+  trustedNowIso as trustedNowIsoImport,
+} from '@/lib/trustedClock';
 
 interface OfflineFormPanelProps {
   machines?: Array<{ id: string; name: string; type: string; measureUnit?: string }>;
@@ -30,10 +40,10 @@ interface OfflineFormPanelProps {
   currentUserProfile?: { id: string; nome: string; role: string; email: string } | null;
 }
 
-export function OfflineFormPanel({ 
-  machines = [], 
-  sites = [], 
-  currentUserProfile 
+export function OfflineFormPanel({
+  machines = [],
+  sites = [],
+  currentUserProfile
 }: OfflineFormPanelProps) {
   // Navigation tabs for the offline cockpit
   const [activeTab, setActiveTab] = useState<'checklist' | 'history'>('checklist');
@@ -48,7 +58,17 @@ export function OfflineFormPanel({
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [shiftCreationError, setShiftCreationError] = useState<string | null>(null);
   const startShift = useShiftStore((s) => s.startShift);
+  const endShiftStore = useShiftStore((s) => s.endShift);
   const activeShift = useShiftStore((s) => s.activeShift);
+  const feedback = useShiftFeedback();
+
+  // Proteção contra registro com data/hora adulterada no relógio do aparelho.
+  // Quando o drift entre o relógio do device e o servidor Supabase ultrapassa
+  // o limite severo (>1h), o submit é bloqueado com mensagem clara.
+  // O backend (trigger no Postgres) é a camada final de autoridade — ele sempre
+  // sobrescreve `criado_em` com `now()` real do servidor.
+  const { blocksSubmits: clockBlocked, severity: clockSeverity, driftMs } =
+    useClockGuard();
 
   // Unified form state
   const [machineId, setMachineId] = useState('');
@@ -173,100 +193,390 @@ export function OfflineFormPanel({
     setPhotos(photos.filter((_, i) => i !== idx));
   };
 
-  // Unified form submit: saves to both checklists and registrosDiarios
+  // Unified form submit: routes between three modes based on active shift + filled fields.
+  //   * OPEN  — no active shift, horimetroFinal empty          → create rascunho + startShift()
+  //   * FULL  — no active shift, horimetroFinal filled         → create closed record + checklist
+  //   * CLOSE — active shift exists, horimetroFinal required    → update rascunho → fechado
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!machineId) {
-      alert("Selecione a máquina.");
-      return;
-    }
-    if (!currentUserProfile?.id) {
-      alert("Operador não identificado. Faça login novamente.");
+    unlockAudio(); // first user gesture — guarantees future audio plays
+
+    // ⚠️ Bloqueio contra data adulterada no relógio do aparelho.
+    // Se o drift entre o relógio do device e o do servidor for severo
+    // (severity === 'block'), o turno não é gravado.
+    if (clockBlocked) {
+      playError();
+      feedback.showWithSound({
+        kind: 'error',
+        title: 'Registro BLOQUEADO — relógio do aparelho adulterado',
+        subtitle:
+          'Detectamos que a data/hora do aparelho está muito diferente do servidor.',
+        errorMessage:
+          `Drift: ${typeof driftMs === 'number' ? Math.round(driftMs / 1000) : '?'}s. ` +
+          'Ative "Data e hora automáticas" nas configurações do aparelho e toque em "Revalidar" no banner.',
+      });
       return;
     }
 
-    const horimetroInicial = parseFloat(horimetroInicialRef.current?.value || '0');
-    const horimetroFinal = parseFloat(horimetroFinalRef.current?.value || '0');
-    const fuelAdded = parseFloat(fuelAddedRef.current?.value || '0');
+    const operatorId = currentUserProfile?.id;
+    if (!operatorId) {
+      playError();
+      feedback.showWithSound({
+        kind: 'error',
+        title: 'Operador não identificado',
+        subtitle: 'Faça login novamente.',
+        errorMessage: 'Não foi possível carregar o perfil do operador.',
+      });
+      return;
+    }
+
+    const horimetroInicial = parseDecimal(horimetroInicialRef.current?.value);
+    const horimetroFinalStr = (horimetroFinalRef.current?.value || '').trim();
+    // Accepts both "30,5" (pt-BR) and "30.5" — parseFloat would truncate at the comma.
+    const horimetroFinalParsed = parseDecimal(horimetroFinalStr);
+    const horimetroFinal = horimetroFinalStr === '' ? NaN : horimetroFinalParsed;
+    const fuelAdded = parseDecimal(fuelAddedRef.current?.value || 0);
     const observations = commentsRef.current?.value || '';
 
-    if (horimetroFinal < horimetroInicial) {
-      alert("O Horímetro Final não pode ser menor que o Horímetro Inicial.");
+    // Refuse to start a different shift while another is open.
+    if (activeShift && activeShift.operatorId === operatorId && activeShift.machineId !== machineId) {
+      playError();
+      feedback.showWithSound({
+        kind: 'error',
+        title: 'Já existe um turno em andamento',
+        subtitle: `Encerre o turno da máquina ${activeShift.machineId} antes de iniciar outro.`,
+        errorMessage: 'Toque em "Encerrar Turno" no banner verde para fechar o turno atual.',
+      });
       return;
     }
 
-    const hasCritical = Object.values(checklistAnswers).some(val => val === 'critico');
-    const hasRepair = Object.values(checklistAnswers).some(val => val === 'reparar');
-    const status: 'aprovado' | 'atencao' | 'critico' = hasCritical 
-      ? 'critico' 
-      : hasRepair 
-        ? 'atencao' 
-        : 'aprovado';
+    const isClosing = !!activeShift && activeShift.operatorId === operatorId;
+    const wantsFullRecord = !isClosing && horimetroFinalStr !== '' && Number.isFinite(horimetroFinal);
 
-    const recordId = genId();
-    const today = new Date().toISOString().split('T')[0];
-    const operatorId = currentUserProfile.id;
-
-    const newChecklist = {
-      id: recordId,
-      machineId: machineId,
-      supervisorId: operatorId,
-      data: today,
-      horaEntrada: '07:00',
-      horaSaida: '17:00',
-      horimetro: horimetroFinal,
-      status: status,
-      answers: { ...checklistAnswers },
-      synced: 0,
-      observacoes: observations,
-      defectPhotos: [...photos]
-    };
-
-    const newDailyLog = {
-      id: recordId,
-      operatorId: operatorId,
-      machineId: machineId,
-      siteId: siteId || sites[0] || '',
-      data: today,
-      horimetroInicial: horimetroInicial,
-      horimetroFinal: horimetroFinal,
-      status: 'fechado' as const,
-      fuelAdded: fuelAdded,
-      observations: observations,
-      synced: 0,
-      photos: [...photos]
-    };
+    // ⚠️ Usa a data/hora "confiável" (do servidor, com cache local). Se nunca
+    // conseguimos medir online, cai no fallback do device. De qualquer jeito, o
+    // trigger do Postgres sobrescreve `criado_em` com `now()` real na hora de
+    // sincronizar.
+    const today = trustedDayStringImport();
+    const nowIso = trustedNowIsoImport();
 
     try {
-      await localDb.checklists.add(newChecklist);
-      await localDb.registrosDiarios.add(newDailyLog);
+      // ---------------------------------------------------------------
+      // MODE 1 — CLOSE  (active shift exists)
+      // ---------------------------------------------------------------
+      if (isClosing) {
+        if (!Number.isFinite(horimetroFinal) || horimetroFinal < activeShift!.horimetroInicial) {
+          playError();
+          feedback.showWithSound({
+            kind: 'error',
+            title: 'Horímetro final inválido',
+            subtitle: `Deve ser maior ou igual a ${activeShift!.horimetroInicial}.`,
+            errorMessage: `Valor recebido: ${horimetroFinalStr || '(vazio)'}. Confira o painel da máquina e tente de novo.`,
+          });
+          return;
+        }
+
+        const horaFim = trustedNowIsoImport();
+
+        // Update the existing rascunho with the close data
+        await localDb.registrosDiarios.update(activeShift!.id, {
+          horimetroFinal,
+          fuelAdded,
+          observations,
+          status: 'fechado',
+          horaFim,
+          fechadoEm: horaFim,
+          synced: 0,
+          photos: [...photos],
+          clock_skew_ms: typeof driftMs === 'number' ? driftMs : null,
+          clock_skew_suspect: clockSeverity !== 'ok' ? 1 as const : 0 as const,
+        });
+
+        // Persist the checklist as a separate record
+        const hasCritical = Object.values(checklistAnswers).some((val) => val === 'critico');
+        const hasRepair = Object.values(checklistAnswers).some((val) => val === 'reparar');
+        const checklistStatus: 'aprovado' | 'atencao' | 'critico' = hasCritical
+          ? 'critico'
+          : hasRepair
+          ? 'atencao'
+          : 'aprovado';
+
+        await localDb.checklists.add({
+          id: genId(),
+          machineId: activeShift!.machineId,
+          supervisorId: operatorId,
+          data: today,
+          horaEntrada: new Date(activeShift!.startedAt).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          horaSaida: new Date(horaFim).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          horimetro: horimetroFinal,
+          status: checklistStatus,
+          answers: { ...checklistAnswers },
+          synced: 0,
+          observacoes: observations,
+          defectPhotos: [...photos],
+        });
+
+        await syncEngine.countPendingRecords();
+        await syncEngine.runSync();
+
+        const delta = Number((horimetroFinal - activeShift!.horimetroInicial).toFixed(1));
+        const duracaoMs = new Date(horaFim).getTime() - new Date(activeShift!.startedAt).getTime();
+        const duracaoHoras = duracaoMs / 3_600_000;
+        const duracaoFmt = `${Math.floor(duracaoHoras)}h ${String(Math.round((duracaoHoras % 1) * 60)).padStart(2, '0')}min`;
+
+        feedback.showWithSound({
+          kind: 'close',
+          title: 'Turno Fechado!',
+          subtitle: 'Registro salvo no aparelho e sincronizado com o servidor.',
+          details: [
+            { label: 'Máquina', value: activeShift!.machineId },
+            {
+              label: 'Horímetro',
+              value: `${activeShift!.horimetroInicial} → ${horimetroFinal}`,
+              emphasis: 'highlight',
+            },
+            { label: 'Trabalhadas', value: `${delta}h • ${duracaoFmt}` },
+            ...(fuelAdded > 0 ? [{ label: 'Combustível', value: `${fuelAdded} L` }] : []),
+            ...(checklistStatus !== 'aprovado'
+              ? [{ label: 'Vistoria', value: checklistStatus.toUpperCase(), emphasis: 'highlight' as const }]
+              : []),
+          ],
+        });
+
+        endShiftStore();
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 5000);
+        resetManualForm();
+        loadRecentLogs();
+        return;
+      }
+
+      // ---------------------------------------------------------------
+      // MODE 2 — FULL  (no active shift, final already filled)
+      // Treat as a single-submit complete record (legacy behavior).
+      // ---------------------------------------------------------------
+      if (wantsFullRecord) {
+        if (!machineId) {
+          playError();
+          feedback.showWithSound({
+            kind: 'error',
+            title: 'Selecione a máquina',
+            errorMessage: 'Escolha a máquina no menu superior antes de salvar.',
+          });
+          return;
+        }
+        if (horimetroFinal < horimetroInicial) {
+          playError();
+          feedback.showWithSound({
+            kind: 'error',
+            title: 'Horímetro final menor que o inicial',
+            subtitle: `Inicial: ${horimetroInicial} • Final: ${horimetroFinal}`,
+            errorMessage: 'Confira os valores digitados. O final não pode ser menor que o inicial.',
+          });
+          return;
+        }
+
+        const hasCritical = Object.values(checklistAnswers).some((val) => val === 'critico');
+        const hasRepair = Object.values(checklistAnswers).some((val) => val === 'reparar');
+        const status: 'aprovado' | 'atencao' | 'critico' = hasCritical
+          ? 'critico'
+          : hasRepair
+          ? 'atencao'
+          : 'aprovado';
+
+        const recordId = genId();
+
+        const newChecklist = {
+          id: recordId,
+          machineId,
+          supervisorId: operatorId,
+          data: today,
+          horaEntrada: '07:00',
+          horaSaida: '17:00',
+          horimetro: horimetroFinal,
+          status,
+          answers: { ...checklistAnswers },
+          synced: 0,
+          observacoes: observations,
+          defectPhotos: [...photos],
+        };
+
+        const newDailyLog = {
+          id: recordId,
+          operatorId,
+          machineId,
+          siteId:
+            siteId ||
+            (typeof sites[0] === 'string' ? sites[0] : (sites[0] as any)?.nome || (sites[0] as any)?.name) ||
+            '',
+          data: today,
+          horimetroInicial,
+          horimetroFinal,
+          status: 'fechado' as const,
+          fuelAdded,
+          observations,
+          synced: 0,
+          photos: [...photos],
+          horaInicio: nowIso,
+          horaFim: nowIso,
+          fechadoEm: nowIso,
+          // Marca o registro pra revisão manual quando havia drift mensurável
+          // no momento do submit. O backend usa `criado_em = now()` autoritativo,
+          // então mesmo que o front esteja errado, a auditoria pega.
+          clock_skew_ms: typeof driftMs === 'number' ? driftMs : null,
+          clock_skew_suspect: clockSeverity !== 'ok' ? 1 as const : 0 as const,
+        };
+
+        await localDb.checklists.add(newChecklist);
+        await localDb.registrosDiarios.add(newDailyLog);
+        await syncEngine.countPendingRecords();
+        await syncEngine.runSync();
+
+        const delta = Number((horimetroFinal - horimetroInicial).toFixed(1));
+
+        feedback.showWithSound({
+          kind: 'close',
+          title: 'Turno Salvo!',
+          subtitle: 'Registro completo gravado no aparelho e sincronizado.',
+          details: [
+            { label: 'Máquina', value: machineId },
+            { label: 'Horímetro', value: `${horimetroInicial} → ${horimetroFinal}`, emphasis: 'highlight' },
+            { label: 'Trabalhadas', value: `${delta}h` },
+            ...(fuelAdded > 0 ? [{ label: 'Combustível', value: `${fuelAdded} L` }] : []),
+            ...(status !== 'aprovado'
+              ? [{ label: 'Vistoria', value: status.toUpperCase(), emphasis: 'highlight' as const }]
+              : []),
+          ],
+        });
+
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 5000);
+        resetManualForm();
+        loadRecentLogs();
+        return;
+      }
+
+      // ---------------------------------------------------------------
+      // MODE 3 — OPEN  (no active shift, no final filled)
+      // Create rascunho + startShift().
+      // ---------------------------------------------------------------
+      if (!machineId) {
+        playError();
+        feedback.showWithSound({
+          kind: 'error',
+          title: 'Selecione a máquina',
+          subtitle: 'Escolha a máquina no menu superior antes de abrir o turno.',
+          errorMessage: 'O turno não foi aberto.',
+        });
+        return;
+      }
+      if (!Number.isFinite(horimetroInicial) || horimetroInicial < 0) {
+        playError();
+        feedback.showWithSound({
+          kind: 'error',
+          title: 'Horímetro inicial inválido',
+          errorMessage: 'Digite o valor que aparece no painel da máquina.',
+        });
+        return;
+      }
+
+      const recordId = genId();
+      const rascunho = {
+        id: recordId,
+        operatorId,
+        machineId,
+        siteId:
+          siteId ||
+          (typeof sites[0] === 'string' ? sites[0] : (sites[0] as any)?.nome || (sites[0] as any)?.name) ||
+          '',
+        data: today,
+        horimetroInicial,
+        // horimetroFinal left undefined until the operator closes the shift.
+        fuelAdded: 0,
+        observations: '',
+        status: 'rascunho' as const,
+        synced: 0,
+        photos: [...photos],
+        horaInicio: nowIso,
+        clock_skew_ms: typeof driftMs === 'number' ? driftMs : null,
+        clock_skew_suspect: clockSeverity !== 'ok' ? 1 as const : 0 as const,
+      };
+
+      await localDb.registrosDiarios.add(rascunho);
       await syncEngine.countPendingRecords();
 
-      setSavedSuccess(true);
-      setMachineId('');
-      setSiteId('');
-      setChecklistAnswers({
-        motor: 'bom',
-        hidraulica: 'bom',
-        eletrica: 'bom',
-        freios: 'bom',
-        pneus_lagartas: 'bom',
-        luzes: 'bom',
-        nivel_oleo: 'bom',
-        vazamentos: 'bom'
+      const machine = (machines || []).find((m) => m.id === machineId);
+      startShift({
+        id: recordId,
+        machineId,
+        machineName: machine?.name || '',
+        operatorId,
+        operatorName: currentUserProfile.nome,
+        startedAt: nowIso,
+        horimetroInicial,
+        siteId: rascunho.siteId,
+        data: today,
       });
-      setPhotos([]);
+
+      feedback.showWithSound({
+        kind: 'open',
+        title: 'Turno Aberto!',
+        subtitle: 'Operação registrada. Encerre ao final do dia.',
+        details: [
+          { label: 'Máquina', value: machineId },
+          { label: 'Horímetro inicial', value: String(horimetroInicial), emphasis: 'highlight' },
+          {
+            label: 'Entrada',
+            value: new Date(nowIso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          },
+        ],
+      });
+
+      // Don't fully reset — keep machine/site/checklist so the user can come back
+      // and only fill the close fields. But clear the inputs.
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 5000);
       if (horimetroInicialRef.current) horimetroInicialRef.current.value = '';
-      if (horimetroFinalRef.current) horimetroFinalRef.current.value = '';
       if (fuelAddedRef.current) fuelAddedRef.current.value = '';
       if (commentsRef.current) commentsRef.current.value = '';
-
-      setTimeout(() => setSavedSuccess(false), 5000);
+      setPhotos([]);
       loadRecentLogs();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Falha ao salvar registro:', err);
-      alert('Erro ao gravar no IndexedDB local.');
+      playError();
+      feedback.showWithSound({
+        kind: 'error',
+        title: 'Erro ao salvar registro',
+        subtitle: 'O registro NÃO foi gravado. Tente novamente.',
+        errorMessage: err?.message || String(err),
+      });
     }
+  };
+
+  const resetManualForm = () => {
+    setMachineId('');
+    setSiteId('');
+    setChecklistAnswers({
+      motor: 'bom',
+      hidraulica: 'bom',
+      eletrica: 'bom',
+      freios: 'bom',
+      pneus_lagartas: 'bom',
+      luzes: 'bom',
+      nivel_oleo: 'bom',
+      vazamentos: 'bom',
+    });
+    setPhotos([]);
+    if (horimetroInicialRef.current) horimetroInicialRef.current.value = '';
+    if (horimetroFinalRef.current) horimetroFinalRef.current.value = '';
+    if (fuelAddedRef.current) fuelAddedRef.current.value = '';
+    if (commentsRef.current) commentsRef.current.value = '';
   };
 
   // ---------------------------------------------------------------------
@@ -275,9 +585,14 @@ export function OfflineFormPanel({
   const scannerMockItems: QrScannerMockItem[] = React.useMemo(() => {
     return (machines || []).map((m) => ({
       code: `CODELMAQ-EQ-${m.id}`,
-      label: m.id,
-      sublabel: m.name || m.type,
-      color: 'yellow',
+      title: m.id,
+      subtitle: m.name || m.type,
+      tag: m.type,
+      payload: {
+        id: m.id,
+        nome: m.name,
+        type: 'machine' as const,
+      },
     }));
   }, [machines]);
 
@@ -289,7 +604,13 @@ export function OfflineFormPanel({
     setScannerOpen(false);
     setShiftCreationError(null);
     if (activeShift) {
-      setShiftCreationError('Já existe um turno em andamento. Encerre-o antes de iniciar outro.');
+      playError();
+      feedback.showWithSound({
+        kind: 'error',
+        title: 'Já existe um turno em andamento',
+        subtitle: `Encerre o turno da máquina ${activeShift.machineId} antes de iniciar outro.`,
+        errorMessage: 'Use o banner verde no topo da tela ou toque em "Encerrar Turno".',
+      });
       return;
     }
     const machineIdFromCode = code.replace(/^CODELMAQ-EQ-/, '');
@@ -309,7 +630,9 @@ export function OfflineFormPanel({
         .filter((r) => r.status === 'fechado' && typeof r.horimetroFinal === 'number' && !isNaN(r.horimetroFinal))
         .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
       if (closed.length > 0) {
-        setPreviousHorimetro(closed[0].horimetroFinal);
+        // We already filtered to ensure horimetroFinal is a number.
+        const finalValue = closed[0].horimetroFinal as number;
+        setPreviousHorimetro(finalValue);
         setPreviousEndDate(closed[0].data || null);
       } else {
         setPreviousHorimetro(null);
@@ -325,35 +648,41 @@ export function OfflineFormPanel({
   const handleStartShift = async (data: { machineId: string; machineName?: string; horimetroInicial: number; horaInicio: string; previousHorimetro?: number }) => {
     try {
       if (!currentUserProfile?.id) {
-        setShiftCreationError('Usuário não identificado. Faça login novamente.');
+        playError();
+        feedback.showWithSound({
+          kind: 'error',
+          title: 'Usuário não identificado',
+          subtitle: 'Faça login novamente para abrir um turno.',
+          errorMessage: 'Sessão expirada ou operador sem perfil carregado.',
+        });
         return;
       }
 
       // Find machine record from props (fall back to id only)
       const machine = (machines || []).find((m) => m.id === data.machineId);
+      const nowIso = trustedNowIsoImport();
+      const todayStr = nowIso.split('T')[0];
 
       // Create a rascunho registro_diario tied to the user's first site
       const newDailyLog = {
         id: genId(),
-        date: new Date().toISOString().slice(0, 10),
-        time: new Date().toISOString().slice(11, 16),
+        date: todayStr,
+        data: todayStr,
+        time: nowIso.slice(11, 16),
         machineId: data.machineId,
         machineName: data.machineName || machine?.name || '',
         machineType: machine?.type || '',
         operatorId: currentUserProfile.id,
         operatorName: currentUserProfile.nome,
-        siteId: sites[0] || '',
+        siteId: (typeof sites[0] === 'string' ? sites[0] : (sites[0] as any)?.nome || (sites[0] as any)?.name) || '',
         horimetroInicial: data.horimetroInicial,
-        horimetroFinal: null as number | null,
+        // horimetroFinal intentionally left undefined until the shift is closed.
         fuelAdded: 0,
-        fuelLevel: null as number | null,
-        workDescription: '',
         observations: '',
         status: 'rascunho' as const,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: nowIso,
+        updatedAt: nowIso,
         horaInicio: data.horaInicio,
-        horaFim: null as string | null,
         photos: [],
         synced: 0,
         syncFailed: 0,
@@ -368,9 +697,10 @@ export function OfflineFormPanel({
         machineName: newDailyLog.machineName,
         operatorId: newDailyLog.operatorId,
         operatorName: newDailyLog.operatorName,
-        startedAt: newDailyLog.createdAt,
+        startedAt: nowIso,
         horimetroInicial: newDailyLog.horimetroInicial,
         siteId: newDailyLog.siteId,
+        data: todayStr,
       });
 
       // Pre-select the machine in the form
@@ -381,9 +711,37 @@ export function OfflineFormPanel({
       setPreviousEndDate(null);
 
       setScannedCode(null);
-    } catch (e) {
+
+      // Big visual + audio confirmation
+      feedback.showWithSound({
+        kind: 'open',
+        title: 'Turno Aberto!',
+        subtitle: 'Operação registrada no aparelho. Encerre ao final do dia.',
+        details: [
+          { label: 'Máquina', value: data.machineId },
+          {
+            label: 'Horímetro inicial',
+            value: String(data.horimetroInicial),
+            emphasis: 'highlight',
+          },
+          {
+            label: 'Entrada',
+            value: new Date(data.horaInicio).toLocaleTimeString('pt-BR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          },
+        ],
+      });
+    } catch (e: any) {
       console.error('Erro ao iniciar turno:', e);
-      setShiftCreationError('Erro ao criar turno. Tente novamente.');
+      playError();
+      feedback.showWithSound({
+        kind: 'error',
+        title: 'Erro ao abrir turno',
+        subtitle: 'O turno NÃO foi criado. Tente novamente.',
+        errorMessage: e?.message || String(e),
+      });
     }
   };
 
@@ -448,6 +806,79 @@ export function OfflineFormPanel({
       {/* UNIFIED FORM */}
       {activeTab === 'checklist' && (
         <form onSubmit={handleSubmit} className="space-y-4 bg-white dark:bg-[#151515]/5 border-2 border-gray-300 dark:border-white/10 rounded-2xl p-4 sm:p-5 md:p-6 backdrop-blur-md shadow-sm">
+          {/* Anti-clock-tampering strip: aparece quando o drift está nas zonas
+              'warn' ou 'block'. No modo 'block', o submit já é recusado em código,
+              então aqui só mostramos o aviso visual pra deixar claro o motivo. */}
+          {clockSeverity !== 'ok' && (
+            <div
+              className={`p-3 rounded-xl border flex items-start gap-2 text-xs md:text-sm ${
+                clockBlocked
+                  ? 'bg-red-500/15 border-red-500/50 text-red-700 dark:text-red-300'
+                  : 'bg-amber-500/15 border-amber-500/50 text-amber-800 dark:text-amber-200'
+              }`}
+            >
+              <Clock size={16} className="mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-black uppercase tracking-wider text-[10px] md:text-[11px]">
+                  {clockBlocked
+                    ? 'Submit bloqueado: relógio do aparelho adulterado'
+                    : 'Atenção: relógio do aparelho divergente do servidor'}
+                </p>
+                <p className="text-[11px] md:text-xs mt-0.5 opacity-90">
+                  Drift detectado: {typeof driftMs === 'number' ? Math.round(driftMs / 60000) : '?'} min.
+                  {clockBlocked
+                    ? ' Ative "Data e hora automáticas" no aparelho e revalide no banner superior.'
+                    : ' Recomendamos ativar a data automática nas configurações.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Mode banner — tells the operator what the next submit will do. */}
+          {(() => {
+            const horimetroFinalLive = (horimetroFinalRef.current?.value || '').trim();
+            const isClosing = !!activeShift && activeShift.operatorId === currentUserProfile?.id;
+            const wantsFull = !isClosing && horimetroFinalLive !== '';
+            const mode = isClosing ? 'close' : wantsFull ? 'full' : 'open';
+            const MODE_CONFIG = {
+              open: {
+                bg: 'bg-emerald-500/10 border-emerald-500/40',
+                text: 'text-emerald-700 dark:text-emerald-300',
+                icon: <Play size={16} fill="currentColor" />,
+                title: 'MODO ABERTURA',
+                subtitle: isClosing
+                  ? undefined
+                  : 'Preencha máquina, obra, horímetro inicial e checklist. Deixe o horímetro final em branco para abrir o turno.',
+              },
+              full: {
+                bg: 'bg-blue-500/10 border-blue-500/40',
+                text: 'text-blue-700 dark:text-blue-300',
+                icon: <CheckCircle size={16} />,
+                title: 'MODO REGISTRO COMPLETO',
+                subtitle: 'Você preencheu horímetro final. Este submit cria um registro fechado de uma vez só (sem ficar em aberto).',
+              },
+              close: {
+                bg: 'bg-blue-500/10 border-blue-500/40',
+                text: 'text-blue-700 dark:text-blue-300',
+                icon: <Square size={14} fill="currentColor" />,
+                title: 'MODO FECHAMENTO',
+                subtitle: activeShift
+                  ? `Turno da máquina ${activeShift.machineId} em andamento desde ${new Date(activeShift.startedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Preencha o horímetro final e clique em Encerrar Turno.`
+                  : 'Encerre o turno atual.',
+              },
+            } as const;
+            const cfg = MODE_CONFIG[mode];
+            return (
+              <div className={`p-3 ${cfg.bg} border ${cfg.text} rounded-xl flex items-start gap-2 text-xs md:text-sm`}>
+                <div className="mt-0.5 flex-shrink-0">{cfg.icon}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-black uppercase tracking-wider text-[11px]">{cfg.title}</p>
+                  {cfg.subtitle && <p className="opacity-90 mt-0.5">{cfg.subtitle}</p>}
+                </div>
+              </div>
+            );
+          })()}
+
           {savedSuccess && (
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl text-sm sm:text-base font-medium flex items-center gap-2">
               <CheckCircle size={18} />
@@ -500,9 +931,17 @@ export function OfflineFormPanel({
               <div className="relative">
                 <Gauge className="absolute left-4 top-1/2 -translate-y-1/2 md:top-2.5 md:translate-y-0 text-gray-600 dark:text-gray-300" size={20} />
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   required
                   ref={horimetroInicialRef}
+                  onInput={(e) => {
+                    // Strip anything that isn't a digit/comma/period so pt-BR "30,5"
+                    // works. Input is uncontrolled, so direct DOM write is safe.
+                    const original = e.currentTarget.value;
+                    const cleaned = original.replace(/[^\d.,-]/g, '');
+                    if (cleaned !== original) e.currentTarget.value = cleaned;
+                  }}
                   placeholder="Ex: 1450"
                   className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
                 />
@@ -514,9 +953,15 @@ export function OfflineFormPanel({
               <div className="relative">
                 <Gauge className="absolute left-4 top-1/2 -translate-y-1/2 md:top-2.5 md:translate-y-0 text-gray-600 dark:text-gray-300" size={20} />
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   required
                   ref={horimetroFinalRef}
+                  onInput={(e) => {
+                    const original = e.currentTarget.value;
+                    const cleaned = original.replace(/[^\d.,-]/g, '');
+                    if (cleaned !== original) e.currentTarget.value = cleaned;
+                  }}
                   placeholder="Ex: 1462"
                   className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
                 />
@@ -528,8 +973,14 @@ export function OfflineFormPanel({
               <div className="relative">
                 <Fuel className="absolute left-4 top-1/2 -translate-y-1/2 md:top-2.5 md:translate-y-0 text-gray-600 dark:text-gray-300" size={20} />
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   ref={fuelAddedRef}
+                  onInput={(e) => {
+                    const original = e.currentTarget.value;
+                    const cleaned = original.replace(/[^\d.,-]/g, '');
+                    if (cleaned !== original) e.currentTarget.value = cleaned;
+                  }}
                   placeholder="0"
                   className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
                 />
@@ -537,12 +988,22 @@ export function OfflineFormPanel({
             </div>
 
             <div className="flex flex-col space-y-2">
-              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Data do Diário</label>
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">
+                Data do Diário {clockBlocked ? '(bloqueada)' : '(servidor)'}
+              </label>
               <input
                 type="text"
                 disabled
                 className="w-full bg-gray-100 dark:bg-[#151515]/5 border-2 border-gray-300 dark:border-white/5 rounded-xl p-4 md:p-2.5 text-xl md:text-xs text-gray-900 dark:text-gray-200 font-bold"
-                value={new Date().toLocaleDateString('pt-BR')}
+                value={(() => {
+                  try {
+                    const iso = trustedNowIsoImport();
+                    const [y, m, d] = iso.split('T')[0].split('-');
+                    return `${d}/${m}/${y}`;
+                  } catch {
+                    return new Date().toLocaleDateString('pt-BR');
+                  }
+                })()}
               />
             </div>
           </div>
@@ -652,15 +1113,41 @@ export function OfflineFormPanel({
             />
           </div>
 
-          {/* Submit */}
+          {/* Submit — button label adapts to the current mode */}
           <div className="pt-2 flex justify-end">
-            <button
-              type="submit"
-              className="w-full md:w-auto px-6 py-3 md:py-2.5 bg-[#eab308] hover:bg-[#ca8a04] text-black font-bold font-heading rounded-xl cursor-pointer text-base md:text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-lg shadow-yellow-500/20"
-            >
-              <CheckCircle size={18} className="md:!size-3.5" />
-              Fechar Turno Diário Offline-First
-            </button>
+            {(() => {
+              const horimetroFinalLive = (horimetroFinalRef.current?.value || '').trim();
+              const isClosing = !!activeShift && activeShift.operatorId === currentUserProfile?.id;
+              const wantsFull = !isClosing && horimetroFinalLive !== '';
+              const mode = isClosing ? 'close' : wantsFull ? 'full' : 'open';
+              const BTN_CONFIG = {
+                open: {
+                  label: 'Abrir Turno',
+                  icon: <Play size={18} className="md:!size-3.5" fill="currentColor" />,
+                  classes: 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30',
+                },
+                full: {
+                  label: 'Salvar Turno Completo',
+                  icon: <CheckCircle size={18} className="md:!size-3.5" />,
+                  classes: 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30',
+                },
+                close: {
+                  label: 'Encerrar Turno',
+                  icon: <Square size={14} className="md:!size-3" fill="currentColor" />,
+                  classes: 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30',
+                },
+              } as const;
+              const cfg = BTN_CONFIG[mode];
+              return (
+                <button
+                  type="submit"
+                  className={`w-full md:w-auto px-6 py-3 md:py-2.5 ${cfg.classes} font-bold font-heading rounded-xl cursor-pointer text-base md:text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors`}
+                >
+                  {cfg.icon}
+                  {cfg.label}
+                </button>
+              );
+            })()}
           </div>
         </form>
       )}
