@@ -111,9 +111,9 @@ export function ListaAprovacoes({ onStatusUpdate }: { onStatusUpdate?: (id: stri
               <div>
                 <p className="font-bold text-gray-800 dark:text-gray-100">{user.nome}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  {ROLE_LABELS[normalizeRole(user.role)] || user.role || 'Operador'}
+                  {ROLE_LABELS[normalizeRole(user.funcao ?? user.role)] || user.funcao || user.role || 'Operador'}
                 </p>
-                <p className="text-[10px] text-gray-400">Solicitou acesso em {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Data não informada'}</p>
+                <p className="text-[10px] text-gray-400">Solicitou acesso em {user.criado_em ? new Date(user.criado_em).toLocaleDateString('pt-BR') : 'Data não informada'}</p>
               </div>
             </div>
             <div className="flex space-x-2">
