@@ -37,6 +37,7 @@ import { useFleetStore } from '@/lib/store';
 import { useRouter } from '@/hooks/useRouter';
 
 import { useAuthStore } from '@/store/authStore';
+import { normalizeRole } from '@/types/auth';
 import { SyncIndicator } from './SyncIndicator';
 import { OfflineFormPanel } from './OfflineFormPanel';
 import { ThemeToggle } from './ThemeToggle';
@@ -282,14 +283,25 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
   
   
 
-  const isAdmin = useMemo(() => 
-    userProfile?.role === 'administrador' || 
-    userProfile?.email === 'ale.codelmaq1986@gmail.com', 
+  const isAdmin = useMemo(() =>
+    userProfile?.role === 'administrador' ||
+    userProfile?.email === 'ale.codelmaq1986@gmail.com',
   [userProfile]);
 
+  // Gestor: tem acesso ao painel, à frota e aos relatórios, mas não tem
+  // poderes administrativos (aprovar cadastros, excluir, etc. são
+  // checados contra `isAdmin` em cada handler).
+  const isGestor = useMemo(() => normalizeRole(userProfile?.role) === 'gestor',
+    [userProfile]);
+
+  // Atalho: qualquer perfil com privilégios de gestão (admin ou gestor)
+  // consegue visualizar as telas gerenciais. Os botões críticos de aprovação
+  // / exclusão continuam checando `isAdmin` individualmente.
+  const isManager = useMemo(() => isAdmin || isGestor, [isAdmin, isGestor]);
+
   const isMecanico = useMemo(() => {
-    const roleNorm = (userProfile?.role || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    return roleNorm === 'mecanico' || userProfile?.role === 'Mecânico';
+    const roleNorm = normalizeRole(userProfile?.role);
+    return roleNorm === 'mecanico';
   }, [userProfile]);
 
   const maintenanceAlerts = useMemo(() => {
@@ -1303,43 +1315,74 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
       { id: 'admin', label: 'Painel Administrativo', icon: ShieldCheck, path: '/configuracoes' },
       { id: 'qr-codes', label: 'QR Codes da Frota', icon: QrCode, path: '/qr-codes' },
     ];
-    
+
     if (isAdmin) {
       return items;
     }
-    
-    const roleNormalized = (userProfile?.role || 'colaborador').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    
+
+    // Gestor: pode ver dashboard, frota (gestão de colaboradores/equipes),
+    // relatórios e admin panel (somente leitura — aprovações/exclusões seguem
+    // protegidas por `isAdmin` em cada handler).
+    if (isGestor) {
+      return items.filter(item =>
+        item.id === 'dashboard' ||
+        item.id === 'machines' ||
+        item.id === 'reports' ||
+        item.id === 'admin' ||
+        item.id === 'qr-codes' ||
+        item.id === 'performance'
+      );
+    }
+
+    const roleNormalized = normalizeRole(userProfile?.role);
+
     if (roleNormalized === 'mecanico') {
-      return items.filter(item => 
-        item.id === 'daily-logs' || 
-        item.id === 'performance' || 
-        item.id === 'fuel-truck' || 
+      return items.filter(item =>
+        item.id === 'daily-logs' ||
+        item.id === 'performance' ||
+        item.id === 'fuel-truck' ||
         item.id === 'workshop'
       );
     }
-    
-    return items.filter(item => 
-      item.id === 'daily-logs' || 
+
+    // Motorista: parte diária, desempenho, caminhão comboio (relevante para a função).
+    if (roleNormalized === 'motorista') {
+      return items.filter(item =>
+        item.id === 'daily-logs' ||
+        item.id === 'performance' ||
+        item.id === 'fuel-truck'
+      );
+    }
+
+    // Operador (e fallback): parte diária + meu desempenho.
+    return items.filter(item =>
+      item.id === 'daily-logs' ||
       item.id === 'performance'
     );
-  }, [isAdmin, userProfile]);
+  }, [isAdmin, isGestor, userProfile]);
 
   // Efeito de segurança para forçar a view correta de acordo com regras de negócio
   useEffect(() => {
     if (isAuthenticated && userProfile && !isAdmin) {
-      const roleNormalized = (userProfile.role || 'colaborador').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      
-      const allowedViews = roleNormalized === 'mecanico'
-        ? ['daily-logs', 'performance', 'fuel-truck', 'workshop']
-        : ['daily-logs', 'performance'];
-        
+      const roleNormalized = normalizeRole(userProfile.role);
+
+      let allowedViews: string[];
+      if (isGestor) {
+        allowedViews = ['dashboard', 'machines', 'reports', 'admin', 'qr-codes', 'performance'];
+      } else if (roleNormalized === 'mecanico') {
+        allowedViews = ['daily-logs', 'performance', 'fuel-truck', 'workshop'];
+      } else if (roleNormalized === 'motorista') {
+        allowedViews = ['daily-logs', 'performance', 'fuel-truck'];
+      } else {
+        allowedViews = ['daily-logs', 'performance'];
+      }
+
       if (!allowedViews.includes(currentView)) {
         console.log("Security redirect: user role", userProfile.role, "attempted to access", currentView);
-        setCurrentView('daily-logs');
+        setCurrentView(allowedViews[0] ?? 'daily-logs');
       }
     }
-  }, [isAuthenticated, userProfile, isAdmin, currentView]);
+  }, [isAuthenticated, userProfile, isAdmin, isGestor, currentView]);
 
   const hasTopBanner = !isSupabaseConfigured || (isDbOffline && isSupabaseConfigured);
 
@@ -1570,7 +1613,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
 
       <main className={`flex-1 p-4 md:p-8 overflow-y-auto ${!isSupabaseConfigured ? 'md:mt-12' : ''}`}>
         <div className="max-w-7xl mx-auto">
-          {currentView === 'dashboard' && isAdmin && (
+          {currentView === 'dashboard' && isManager && (
             <DashboardView machines={machines} maintenances={maintenances} logs={dailyLogs} alerts={maintenanceAlerts} />
           )}
           {currentView === 'daily-logs' && (
@@ -1581,12 +1624,12 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
                   {userProfile?.nome ? userProfile.nome.charAt(0).toUpperCase() : <User size={18} className="md:!size-5" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Operador Identificado</p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Usuário Identificado</p>
                   <p className="text-sm md:text-base font-bold text-gray-900 dark:text-gray-100 truncate">
-                    {userProfile?.nome || (isAdmin ? 'Administrador' : 'Operador')}
+                    {userProfile?.nome || (isAdmin ? 'Administrador' : isGestor ? 'Gestor' : 'Operador')}
                   </p>
                   <p className="text-[11px] md:text-xs text-gray-600 dark:text-gray-400 truncate">
-                    {userProfile?.email || '—'} · {isAdmin ? 'Administrador' : (userProfile?.role || 'Colaborador')}
+                    {userProfile?.email || '—'} · {userProfile?.role || '—'}
                   </p>
                 </div>
                 <div className="hidden sm:flex flex-col items-end text-right">
@@ -1598,23 +1641,28 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
               </div>
 
               {/* Unified Checklist Form (always available) */}
-              <OfflineFormPanel 
-                machines={machines} 
-                sites={sites} 
-                currentUserProfile={userProfile} 
+              <OfflineFormPanel
+                machines={machines}
+                sites={sites}
+                currentUserProfile={userProfile ? {
+                  id: userProfile.id,
+                  nome: userProfile.nome,
+                  role: userProfile.role,
+                  email: userProfile.email || '',
+                } : null}
               />
 
               {/* Admin-only: Online Logs Table + Exports + History */}
               {isAdmin && (
-                <DailyLogView 
-                  logs={dailyLogs} 
-                  machines={machines} 
-                  employees={employees} 
-                  sites={sites} 
-                  onAddLog={handleAddDailyLog} 
-                  onEditLog={handleEditDailyLog} 
-                  onDeleteLog={handleDeleteDailyLog} 
-                  isAdminAuthenticated={isAdmin} 
+                <DailyLogView
+                  logs={dailyLogs}
+                  machines={machines}
+                  employees={employees}
+                  sites={sites}
+                  onAddLog={handleAddDailyLog}
+                  onEditLog={handleEditDailyLog}
+                  onDeleteLog={handleDeleteDailyLog}
+                  isAdminAuthenticated={isAdmin}
                 />
               )}
             </div>
@@ -1631,15 +1679,15 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
             />
           )}
           {currentView === 'fuel-truck' && (isAdmin || isMecanico) && (
-            <FuelTruckView 
-              stock={currentFuelTruckStock} 
-              refills={fuelTruckRefills} 
-              onRefill={handleRefillTruck} 
+            <FuelTruckView
+              stock={currentFuelTruckStock}
+              refills={fuelTruckRefills}
+              onRefill={handleRefillTruck}
               onEditRefill={handleEditRefillTruck}
               onDeleteRefill={handleDeleteRefillTruck}
               onMachineRefill={handleMachineRefillTruck}
               machines={machines}
-              logs={dailyLogs} 
+              logs={dailyLogs}
               isAdmin={isAdmin || isMecanico}
             />
           )}
@@ -1652,22 +1700,22 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
           {currentView === 'workshop' && (isAdmin || isMecanico) && (
             <WorkshopView logs={dailyLogs} machines={machines} employees={employees} plans={maintenancePlans} alerts={maintenanceAlerts} onAddMaintenance={handleAddMaintenance} onUpdateLogStatus={handleUpdateLogStatus} onPerformPreventive={handlePerformPreventive} onPerformCustomPreventive={handlePerformCustomPreventive} onSendToManagement={handleSendToManagement} />
           )}
-          {currentView === 'machines' && isAdmin && (
+          {currentView === 'machines' && isManager && (
             <MachinesView machines={machines} onEditMachine={handleEditMachine} onRemoveMachine={handleRemoveMachine} />
           )}
           {currentView === 'maintenance' && isAdmin && (
-            <MaintenanceView 
-              maintenances={maintenances} 
+            <MaintenanceView
+              maintenances={maintenances}
               machines={machines}
-              onDeleteMaintenance={handleDeleteMaintenance} 
+              onDeleteMaintenance={handleDeleteMaintenance}
               onAddMaintenance={handleAddMaintenance}
-              isAdminAuthenticated={isAdmin} 
+              isAdminAuthenticated={isAdmin}
             />
           )}
-          {currentView === 'reports' && isAdmin && (
+          {currentView === 'reports' && isManager && (
             <ReportsView logs={dailyLogs} machines={machines} employees={employees} />
           )}
-          {currentView === 'admin' && isAdmin && (
+          {currentView === 'admin' && isManager && (
             <AdminView
               machines={machines} onAddMachine={handleAddMachine} onEditMachine={handleEditMachine} onRemoveMachine={handleRemoveMachine} onImportInitialMachines={handleImportInitialMachines}
               onExportFleet={handleExportFleet} onImportFleetJSON={handleImportFleetJSON}
@@ -1683,12 +1731,14 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
               onAddTemplate={handleAddTemplate}
               onAddMaintenancePlan={handleAddMaintenancePlan}
               onUpdateMachine={handleUpdateMachine}
+              isGestor={isGestor}
+              isAdmin={isAdmin}
             />
           )}
           {currentView === 'mobile-hub' && isAdmin && (
             <MobileApkHub />
           )}
-          {currentView === 'qr-codes' && isAdmin && (
+          {currentView === 'qr-codes' && isManager && (
             <QrCodeManager machines={machines} />
           )}
           {currentView === 'profile' && (

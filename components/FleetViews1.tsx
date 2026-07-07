@@ -9,7 +9,7 @@ import {
 import { StatusBadge, UrgencyBadge } from './ui/Badges';
 import { ListaAprovacoes } from './ListaAprovacoes';
 import { exportMachinesToCSV, parseMachinesCSV } from '@/lib/csvUtils';
-import { genId } from '@/lib/utils';
+import { genId, parseDecimal } from '@/lib/utils';
 
 export const DashboardView = ({ machines, maintenances, logs, alerts }: any) => {
   const total = machines.length;
@@ -431,7 +431,7 @@ export const AdminView = ({
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<any>(null);
   const [newEmployeeName, setNewEmployeeName] = useState('');
-  const [newEmployeeRole, setNewEmployeeRole] = useState('Operador de Máquinas');
+  const [newEmployeeRole, setNewEmployeeRole] = useState<string>('operador');
   const [newSite, setNewSite] = useState('');
   const [seedResult, setSeedResult] = useState<any>(null);
   const [seeding, setSeeding] = useState(false);
@@ -604,12 +604,18 @@ export const AdminView = ({
   };
 
   const getRoleBadge = (role: string) => {
+    // Mapeia roles legadas + oficial para um badge consistente.
+    const r = (role || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     let style = "bg-gray-100 dark:bg-[#1e1e1e] text-gray-800 dark:text-gray-100";
-    if (role === 'Operador de Máquinas') style = "bg-blue-100 text-blue-800";
-    if (role === 'Motorista') style = "bg-green-100 text-green-800";
-    if (role === 'Mecânico') style = "bg-red-100 text-red-800";
-    if (role === 'Ajudante') style = "bg-orange-100 text-orange-800";
-    return <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${style}`}>{role}</span>;
+    let label = role || '—';
+    if (r === 'administrador' || r === 'admin') { style = "bg-yellow-100 text-yellow-800 border border-yellow-200"; label = 'Administrador'; }
+    else if (r === 'gestor' || r === 'gerente' || r === 'supervisor') { style = "bg-purple-100 text-purple-800"; label = 'Gestor'; }
+    else if (r === 'motorista' || r === 'driver') { style = "bg-emerald-100 text-emerald-800"; label = 'Motorista'; }
+    else if (r === 'mecanico') { style = "bg-red-100 text-red-800"; label = 'Mecânico'; }
+    else if (r === 'operador' || r === 'colaborador' || r.includes('maquina') || r === 'ajudante') {
+      style = "bg-blue-100 text-blue-800"; label = r === 'ajudante' ? 'Ajudante' : 'Operador';
+    }
+    return <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${style}`}>{label}</span>;
   };
 
   return (
@@ -803,16 +809,16 @@ export const AdminView = ({
                 className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 text-sm"
               />
               <div className="flex gap-2">
-                <select 
+                <select
                   value={newEmployeeRole}
                   onChange={(e) => setNewEmployeeRole(e.target.value)}
                   className="flex-1 p-2 border border-gray-300 dark:border-zinc-700 rounded-md focus:ring-yellow-500 focus:border-yellow-500 text-sm bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100"
                 >
-                  <option value="Operador de Máquinas">Operador de Máquinas</option>
-                  <option value="Motorista">Motorista</option>
-                  <option value="Mecânico">Mecânico</option>
-                  <option value="Ajudante">Ajudante</option>
-                  <option value="Administrador">Administrador</option>
+                  <option value="administrador">Administrador</option>
+                  <option value="gestor">Gestor</option>
+                  <option value="motorista">Motorista</option>
+                  <option value="mecanico">Mecânico</option>
+                  <option value="operador">Operador</option>
                 </select>
                 <button type="submit" className="bg-yellow-500 hover:bg-yellow-600 text-yellow-950 px-4 py-2 rounded-md font-semibold text-sm transition-colors cursor-pointer">
                   Add
@@ -841,11 +847,11 @@ export const AdminView = ({
                 className="p-1 px-1.5 text-[11px] border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-700 dark:text-gray-200"
               >
                 <option value="Todos">Cargos: Todos</option>
-                <option value="Operador de Máquinas">Operador de Máquinas</option>
-                <option value="Motorista">Motorista</option>
-                <option value="Mecânico">Mecânico</option>
-                <option value="Ajudante">Ajudante</option>
-                <option value="Administrador">Administrador</option>
+                <option value="administrador">Administrador</option>
+                <option value="gestor">Gestor</option>
+                <option value="motorista">Motorista</option>
+                <option value="mecanico">Mecânico</option>
+                <option value="operador">Operador</option>
               </select>
 
               <select
@@ -883,7 +889,7 @@ export const AdminView = ({
 
                     <div className="flex gap-1 pt-1.5 items-center justify-end border-t border-dashed border-gray-100 dark:border-white/5">
                       <span className="text-[9px] text-gray-400 font-medium">Ações de Status:</span>
-                      
+
                       {emp.status !== 'aprovado' && (
                         <button
                           type="button"
@@ -893,7 +899,7 @@ export const AdminView = ({
                           Aprovar/Ativar
                         </button>
                       )}
-                      
+
                       {emp.status === 'aprovado' && (
                         <button
                           type="button"
@@ -1017,7 +1023,7 @@ export const AdminView = ({
                 model: formData.get('model'), 
                 year: formData.get('year'),
                 measureUnit: formData.get('measureUnit'),
-                horimeter: Number(formData.get('horimeter')),
+                horimeter: parseDecimal(formData.get('horimeter')),
                 specieType: formData.get('specieType'),
                 bodywork: formData.get('bodywork'),
                 chassis: formData.get('chassis'),
@@ -1078,7 +1084,7 @@ export const AdminView = ({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{editingMachine ? 'Leitura Atual (H/KM)' : 'Leitura Inicial (H/KM)'}</label>
-                  <input name="horimeter" defaultValue={editingMachine?.horimeter} required type="number" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500" placeholder="0" />
+                  <input name="horimeter" defaultValue={editingMachine?.horimeter} required type="text" inputMode="decimal" onInput={(e: any) => { const v = e.currentTarget.value.replace(/[^\d.,-]/g, ''); if (v !== e.currentTarget.value) e.currentTarget.value = v; }} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-zinc-500 focus:ring-yellow-500 focus:border-yellow-500 font-mono" placeholder="Ex: 1450 ou 1450,5" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Espécie/Tipo</label>

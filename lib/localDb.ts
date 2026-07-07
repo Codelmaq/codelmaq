@@ -1,11 +1,18 @@
 import Dexie, { Table } from 'dexie';
 
 // Interfaces for local database schemas representing our offline business models
+export type LocalUserRole =
+  | 'administrador'
+  | 'gestor'
+  | 'motorista'
+  | 'mecanico'
+  | 'operador';
+
 export interface LocalUser {
   id: string;          // uuid or operator identifier
   nome: string;
   email: string;
-  role: 'administrador' | 'colaborador' | 'mecanico';
+  role: LocalUserRole;
   status: 'aprovado' | 'pendente';
   synced: number;      // 0 for offline/needs sync, 1 for online synced
 }
@@ -45,6 +52,24 @@ export interface LocalPenalty {
   sync_error?: string;
 }
 
+export interface LocalBonus {
+  id: string;
+  operatorId: string;
+  operatorName: string;
+  rewardCode: string;            // codigo curto da bonificacao (ex: "EXTRA_SHIFT", "BRAVERY")
+  rewardLabel: string;           // descricao da bonificacao (ex: "Turno extra voluntario")
+  points: number;                // pontos creditados (sempre positivo)
+  photoEvidencia?: string;       // base64 (compressed) — opcional (registro visual do reconhecimento)
+  observacoes?: string;          // nota do admin
+  aplicadoPor: string;           // id do admin que concedeu
+  aplicadoPorNome: string;       // nome do admin
+  dataEvento: string;            // ISO timestamp
+  createdAt: string;
+  synced: number;
+  sync_failed?: number;
+  sync_error?: string;
+}
+
 export interface LocalRegistroDiario {
   id: string;          // uuid
   operatorId: string;
@@ -52,7 +77,11 @@ export interface LocalRegistroDiario {
   siteId: string;
   data: string;        // YYYY-MM-DD
   horimetroInicial: number;
-  horimetroFinal: number;
+  /**
+   * Horímetro final — undefined while the shift is open (rascunho).
+   * Set to a number when the operator closes the shift.
+   */
+  horimetroFinal?: number;
   status: 'rascunho' | 'fechado';
   synced: number;      // 0 = pending, 1 = synced
   sync_failed?: number; // 1 = sync attempted but failed (e.g. FK violation). Stays in queue for review.
@@ -67,6 +96,19 @@ export interface LocalRegistroDiario {
   horaFim?: string;     // ISO timestamp set on shift end
   fechadoEm?: string;   // ISO timestamp set on shift end (alias of horaFim)
   previousHorimetro?: number; // pre-fill reference from last shift's horimetroFinal
+  /**
+   * Drift (em ms, sempre >= 0) entre o relógio do aparelho e o servidor Supabase
+   * no momento em que o turno foi registrado. `null` se nunca medimos online.
+   * Quando preenchido e > 300_000 (5 min), o operador registrou com data/hora
+   * divergente — vale revisão manual pelo gestor.
+   */
+  clock_skew_ms?: number | null;
+  /**
+   * Bandeira que o admin pode usar pra revisar registros feitos com data/hora
+   * potencialmente adulterada. Preenchida automaticamente quando o submit é
+   * permitido mas o último drift medido estava acima da tolerância.
+   */
+  clock_skew_suspect?: 0 | 1;
 }
 
 // Subclass Dexie to define our high-performance Local Database
@@ -75,6 +117,7 @@ class CodelmaqLocalDatabase extends Dexie {
   checklists!: Table<LocalChecklist>;
   registrosDiarios!: Table<LocalRegistroDiario>;
   penalties!: Table<LocalPenalty>;
+  bonuses!: Table<LocalBonus>;
 
   constructor() {
     super('CodelmaqLocalDB');
@@ -99,6 +142,15 @@ class CodelmaqLocalDatabase extends Dexie {
       checklists: 'id, machineId, supervisorId, status, synced, sync_failed',
       registrosDiarios: 'id, operatorId, machineId, siteId, data, status, synced, sync_failed',
       penalties: 'id, operatorId, infractionCode, dataEvento, synced, sync_failed'
+    });
+
+    // v4: add LocalBonus table (Programa de Excelencia — bonificacoes / pontos extras)
+    this.version(4).stores({
+      users: 'id, email, role, status, synced',
+      checklists: 'id, machineId, supervisorId, status, synced, sync_failed',
+      registrosDiarios: 'id, operatorId, machineId, siteId, data, status, synced, sync_failed',
+      penalties: 'id, operatorId, infractionCode, dataEvento, synced, sync_failed',
+      bonuses: 'id, operatorId, rewardCode, dataEvento, synced, sync_failed'
     });
   }
 }
@@ -125,7 +177,7 @@ export async function seedLocalDatabase() {
           id: '11111111-1111-4111-b111-111111111111',
           nome: 'Carlos Silva',
           email: 'operador@codelmaq.com.br',
-          role: 'colaborador',
+          role: 'operador',
           status: 'aprovado',
           synced: 1
         }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { CheckCircle, XCircle, UserPlus, ShieldCheck } from 'lucide-react';
+import { ROLE_LABELS, normalizeRole } from '@/types/auth';
 
 export function ListaAprovacoes({ onStatusUpdate }: { onStatusUpdate?: (id: string, status: string) => void }) {
   const [pendentes, setPendentes] = useState<any[]>([]);
@@ -109,7 +110,9 @@ export function ListaAprovacoes({ onStatusUpdate }: { onStatusUpdate?: (id: stri
               </div>
               <div>
                 <p className="font-bold text-gray-800 dark:text-gray-100">{user.nome}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">{user.role || 'Colaborador'}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  {ROLE_LABELS[normalizeRole(user.role)] || user.role || 'Operador'}
+                </p>
                 <p className="text-[10px] text-gray-400">Solicitou acesso em {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Data não informada'}</p>
               </div>
             </div>

@@ -11,8 +11,9 @@ import {
 import { MAINTENANCE_DB, defaultChecklistItems } from '@/lib/data';
 import { generateFuelTruckPDF, generatePerformancePDF, generateFieldMetricsPDF } from '@/lib/pdfUtils';
 import { genId, formatDateBR, safeTimeOf, safeParseDate } from '@/lib/utils';
-import { localDb, LocalPenalty } from '@/lib/localDb';
+import { localDb, LocalPenalty, LocalBonus } from '@/lib/localDb';
 import { PenaltyModal } from './PenaltyModal';
+import { BonusModal } from './BonusModal';
 
 export const PerformanceView = ({
   scoringRules,
@@ -26,6 +27,8 @@ export const PerformanceView = ({
   const [activeTab, setActiveTab] = useState('ranking');
   const [penalties, setPenalties] = useState<LocalPenalty[]>([]);
   const [penaltyModalOpen, setPenaltyModalOpen] = useState(false);
+  const [bonuses, setBonuses] = useState<LocalBonus[]>([]);
+  const [bonusModalOpen, setBonusModalOpen] = useState(false);
 
   // Reload penalties from local DB
   const reloadPenalties = useCallback(async () => {
@@ -37,12 +40,23 @@ export const PerformanceView = ({
     }
   }, []);
 
+  // Reload bonuses from local DB
+  const reloadBonuses = useCallback(async () => {
+    try {
+      const list = await localDb.bonuses.toArray();
+      setBonuses(list.sort((a, b) => (b.dataEvento || '').localeCompare(a.dataEvento || '')));
+    } catch (e) {
+      console.error('Erro ao carregar bonificações:', e);
+    }
+  }, []);
+
   useEffect(() => {
     const id = setTimeout(() => {
       reloadPenalties();
+      reloadBonuses();
     }, 0);
     return () => clearTimeout(id);
-  }, [reloadPenalties]);
+  }, [reloadPenalties, reloadBonuses]);
 
   // Determine active operator's name
   const userNome = userProfile?.nome || "João Silva";
@@ -124,6 +138,17 @@ export const PerformanceView = ({
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setBonusModalOpen(true)}
+              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold py-2 px-4 rounded-lg flex items-center transition-colors border border-emerald-200 cursor-pointer"
+              title="Bonificar um colaborador (credita pontos)"
+            >
+              <Award size={18} className="mr-2" />
+              Bonificar
+            </button>
+          )}
           {isAdmin && (
             <button
               type="button"
@@ -246,6 +271,103 @@ export const PerformanceView = ({
         );
       })()}
 
+      {/* Minhas Bonificações em Destaque — espelho do card de Penalidades */}
+      {(() => {
+        const filtered = isAdmin
+          ? bonuses
+          : bonuses.filter((b) => b.operatorId === userProfile?.id);
+        const recent = filtered.slice(0, 3);
+        const total = filtered.reduce((acc, b) => acc + b.points, 0);
+        const hasBonuses = recent.length > 0;
+
+        return (
+          <div
+            className={`relative overflow-hidden rounded-2xl border-2 p-4 md:p-5 shadow-sm ${
+              hasBonuses
+                ? 'bg-gradient-to-r from-emerald-50 via-green-50 to-emerald-50 border-emerald-300 dark:from-emerald-900/20 dark:via-green-900/20 dark:to-emerald-900/20 dark:border-emerald-700/50'
+                : 'bg-gradient-to-r from-gray-50 via-slate-50 to-gray-50 border-gray-300 dark:from-[#1a1a1a] dark:via-[#151515] dark:to-[#1a1a1a] dark:border-white/10'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${
+                    hasBonuses
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-gray-300 dark:bg-white/10 text-gray-600 dark:text-gray-300'
+                  }`}
+                >
+                  <Award size={22} />
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className={`text-[10px] md:text-xs uppercase font-black tracking-wider ${
+                      hasBonuses ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-400'
+                    }`}
+                  >
+                    {isAdmin ? 'Bonificações Recentes (toda a frota)' : 'Minhas Bonificações'}
+                  </p>
+                  <h3
+                    className={`text-lg md:text-xl font-black leading-tight ${
+                      hasBonuses ? 'text-emerald-900 dark:text-emerald-100' : 'text-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {hasBonuses
+                      ? `${filtered.length} ${filtered.length === 1 ? 'bonificação ativa' : 'bonificações ativas'} — +${total} pts`
+                      : 'Nenhuma bonificação registrada ainda'}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('bonuses')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider whitespace-nowrap flex-shrink-0 cursor-pointer transition-colors ${
+                  hasBonuses
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-gray-600 hover:bg-gray-700 text-white'
+                }`}
+              >
+                {hasBonuses ? 'Ver todas' : 'Ver histórico'}
+              </button>
+            </div>
+
+            {hasBonuses ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
+                {recent.map((b) => (
+                  <div
+                    key={b.id}
+                    className="bg-white/80 dark:bg-black/30 border-2 border-emerald-200 dark:border-emerald-800/50 rounded-xl p-3 flex items-center gap-2.5"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center flex-shrink-0">
+                      <Award size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
+                        {b.rewardLabel}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] font-mono font-black text-emerald-700 dark:text-emerald-300">
+                          +{b.points} pts
+                        </span>
+                        <span className="text-[10px] text-gray-600 dark:text-gray-400">
+                          · {new Date(b.dataEvento).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 font-medium">
+                {isAdmin
+                  ? 'Use o botão "Bonificar" para reconhecer um colaborador em destaque.'
+                  : 'Quando você se destacar, a gestão credita pontos extras aqui.'}
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Bento Grid — Resumo Operacional de Desempenho */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Pontuação */}
@@ -353,6 +475,14 @@ export const PerformanceView = ({
           <AlertOctagon size={14} />
           <span className="sm:hidden">Penalidades</span>
           <span className="hidden sm:inline">{isAdmin ? 'Penalidades Aplicadas' : 'Minhas Penalidades'}</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('bonuses')}
+          className={`flex-1 min-w-[33%] sm:flex-none sm:min-w-0 px-3 sm:px-6 py-3 text-xs sm:text-sm font-bold transition-colors border-b-2 text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${activeTab === 'bonuses' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-200'} cursor-pointer`}
+        >
+          <Award size={14} />
+          <span className="sm:hidden">Bônus</span>
+          <span className="hidden sm:inline">{isAdmin ? 'Bonificações Aplicadas' : 'Minhas Bonificações'}</span>
         </button>
       </div>
 
@@ -682,6 +812,114 @@ export const PerformanceView = ({
         </div>
       )}
 
+      {activeTab === 'bonuses' && (
+        <div className="bg-white dark:bg-[#151515] rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-200 dark:border-white/10 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h3 className="font-black text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                <Award size={18} />
+                {isAdmin ? 'Bonificações Aplicadas' : 'Minhas Bonificações'}
+              </h3>
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 font-medium">
+                {isAdmin
+                  ? 'Histórico de bonificações creditadas aos operadores. Use para reconhecer excelência em campo.'
+                  : 'Histórico de bonificações creditadas a você pela gestão. Continue se destacando!'}
+              </p>
+            </div>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setBonusModalOpen(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
+              >
+                <Plus size={14} />
+                Nova Bonificação
+              </button>
+            )}
+          </div>
+
+          {(() => {
+            const filtered = isAdmin
+              ? bonuses
+              : bonuses.filter((b) => b.operatorId === userProfile?.id);
+
+            if (filtered.length === 0) {
+              return (
+                <div className="p-10 text-center">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 flex items-center justify-center mb-3">
+                    <Award size={32} />
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-200 font-bold text-base">
+                    {isAdmin ? 'Nenhuma bonificação aplicada ainda.' : 'Você ainda não recebeu bonificações. Continue o bom trabalho!'}
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1.5 font-medium">
+                    {isAdmin ? 'Use o botão acima para reconhecer um colaborador.' : 'Quando se destacar, a gestão credita aqui.'}
+                  </p>
+                </div>
+              );
+            }
+
+            const totalBonus = filtered.reduce((acc, b) => acc + b.points, 0);
+            return (
+              <div>
+                <div className="p-3 bg-gray-50 dark:bg-[#101010] border-b border-gray-200 dark:border-white/10 flex justify-between items-center text-xs">
+                  <span className="font-bold text-gray-700 dark:text-gray-200">
+                    {filtered.length} {filtered.length === 1 ? 'registro' : 'registros'}
+                  </span>
+                  <span className={`font-black text-base ${totalBonus > 0 ? 'text-emerald-600' : 'text-gray-500'}`}>
+                    +{totalBonus} pts
+                  </span>
+                </div>
+                <div className="divide-y divide-gray-200 dark:divide-white/5">
+                  {filtered.map((b) => (
+                    <div key={b.id} className="p-4 flex gap-3 hover:bg-gray-50 dark:hover:bg-[#101010] transition-colors">
+                      {b.photoEvidencia ? (
+                        <div className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-emerald-300 flex-shrink-0 group">
+                          <img src={b.photoEvidencia} alt="registro" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ImageIcon size={16} className="text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-black/20 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 flex-shrink-0">
+                          <Award size={20} />
+                          <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Reconhecimento</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-bold text-sm text-gray-900 dark:text-gray-100">
+                            {b.rewardLabel}
+                          </p>
+                          <span className={`px-2 py-0.5 rounded-md font-black text-sm whitespace-nowrap ${b.points > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                            +{b.points} pts
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-700 dark:text-gray-300 mt-1 font-medium">
+                          {isAdmin ? (
+                            <>Colaborador: <strong>{b.operatorName}</strong></>
+                          ) : (
+                            <>Creditado por: <strong>{b.aplicadoPorNome}</strong></>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5">
+                          {new Date(b.dataEvento).toLocaleString('pt-BR')}
+                        </p>
+                        {b.observacoes && (
+                          <p className="text-xs text-gray-700 dark:text-gray-300 mt-1.5 italic border-l-2 border-emerald-300 dark:border-emerald-700 pl-2">
+                            &quot;{b.observacoes}&quot;
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {isAdmin && (
         <PenaltyModal
           open={penaltyModalOpen}
@@ -689,6 +927,16 @@ export const PerformanceView = ({
           employees={employees || []}
           currentUserProfile={userProfile}
           onApplied={reloadPenalties}
+        />
+      )}
+
+      {isAdmin && (
+        <BonusModal
+          open={bonusModalOpen}
+          onClose={() => setBonusModalOpen(false)}
+          employees={employees || []}
+          currentUserProfile={userProfile}
+          onApplied={reloadBonuses}
         />
       )}
     </div>
@@ -2047,7 +2295,10 @@ export const ReportsView = ({ logs, machines, employees }: any) => {
     return [];
   }, [filteredLogs, reportType, selectedMachine, selectedOperator]);
 
-  const filterableEmployees = employees.filter((e: any) => e.role === 'Operador de Máquinas' || e.role === 'Motorista');
+  const filterableEmployees = employees.filter((e: any) => {
+    const r = (e.role || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return r === 'operador' || r === 'colaborador' || r === 'motorista' || r.startsWith('operador de');
+  });
 
   return (
     <div className="space-y-6">

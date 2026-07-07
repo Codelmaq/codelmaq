@@ -2,19 +2,13 @@
 
 import React from 'react';
 import { User, Mail, Shield, IdCard, LogOut, Calendar } from 'lucide-react';
-import { UsuarioLogado } from '@/types/auth';
+import { UsuarioLogado, ROLE_LABELS, normalizeRole } from '@/types/auth';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from '@/hooks/useRouter';
 
 interface ProfileViewProps {
   userProfile: UsuarioLogado | null;
 }
-
-const ROLE_LABELS: Record<string, string> = {
-  administrador: 'Administrador',
-  colaborador: 'Colaborador',
-  mecanico: 'Mecânico',
-};
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   aprovado: { label: 'Aprovado', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' },
@@ -43,7 +37,7 @@ export const ProfileView = ({ userProfile }: ProfileViewProps) => {
         .join('')
     : 'US';
 
-  const roleLabel = ROLE_LABELS[userProfile.role] || userProfile.role;
+  const roleLabel = ROLE_LABELS[normalizeRole(userProfile.role)] || userProfile.role;
   const statusInfo = STATUS_LABELS[userProfile.status] || {
     label: userProfile.status,
     className: 'bg-gray-500/10 text-gray-700 dark:text-gray-300 border-gray-500/20',

@@ -12,7 +12,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { generateDailyLogsPDF } from '@/lib/pdfUtils';
-import { genId, formatDateBR, safeTimeOf } from '@/lib/utils';
+import { genId, formatDateBR, safeTimeOf, parseDecimal } from '@/lib/utils';
 
 const formatOSId = (id: string) => {
   if (!id) return '';
@@ -338,7 +338,7 @@ const dailyLogSchema = z.object({
   checklist: z.record(z.string(), z.string()).optional(),
 }).refine(data => {
   if (data.endHorimeter !== undefined && data.endHorimeter !== "" && data.endHorimeter !== null) {
-    return Number(data.endHorimeter) >= data.startHorimeter;
+    return parseDecimal(data.endHorimeter) >= data.startHorimeter;
   }
   return true;
 }, {
@@ -506,8 +506,11 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
     setFormPhotos(formPhotos.filter((_, index) => index !== indexToRemove));
   };
 
-  const validOperators = employees.filter((e: any) => e.role === 'Operador de Máquinas');
-  const validDrivers = employees.filter((e: any) => e.role === 'Motorista');
+  const validOperators = employees.filter((e: any) => {
+    const r = (e.role || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return r === 'operador' || r === 'colaborador' || r.startsWith('operador de');
+  });
+  const validDrivers = employees.filter((e: any) => (e.role || '').toLowerCase() === 'motorista');
 
   const onSubmitForm = useCallback((data: DailyLogFormData) => {
     let hasAvaria = false;
@@ -525,7 +528,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
       operator: data.operator,
       location: data.location,
       startHorimeter: data.startHorimeter,
-      endHorimeter: data.endHorimeter === "" ? 0 : Number(data.endHorimeter),
+      endHorimeter: data.endHorimeter === "" ? 0 : parseDecimal(data.endHorimeter),
       fuel: data.fuel,
       fuelSource: data.fuelSource,
       checklist: data.checklist || {},
@@ -1048,7 +1051,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Abastecimento (Litros)</label>
-                  <input {...register("fuel", { valueAsNumber: true })} type="number" min="0" step="0.01" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 focus:ring-yellow-500 focus:border-yellow-500" />
+                  <input {...register("fuel", { setValueAs: (v) => parseDecimal(v) })} type="text" inputMode="decimal" onInput={(e: any) => { const v = (e.currentTarget.value || '').replace(/[^\d.,-]/g, ''); if (v !== e.currentTarget.value) e.currentTarget.value = v; }} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 focus:ring-yellow-500 focus:border-yellow-500" />
                   {errors.fuel && <p className="text-red-500 text-xs mt-1">{errors.fuel.message}</p>}
                 </div>
                 <div>
@@ -1063,22 +1066,22 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Leitura Inicial (Horas ou KM)</label>
-                  <input 
-                    type="number" 
-                    min="0" 
-                    step="0.1"
-                    {...register("startHorimeter", { 
-                      valueAsNumber: true,
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    onInput={(e: any) => { const v = (e.currentTarget.value || '').replace(/[^\d.,-]/g, ''); if (v !== e.currentTarget.value) e.currentTarget.value = v; }}
+                    {...register("startHorimeter", {
+                      setValueAs: (v) => parseDecimal(v),
                       onChange: (e) => setFormStartHorimeter(e.target.value)
-                    })} 
-                    className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 focus:ring-yellow-500 focus:border-yellow-500 font-mono" 
+                    })}
+                    className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 focus:ring-yellow-500 focus:border-yellow-500 font-mono"
                   />
                   {errors.startHorimeter && <p className="text-red-500 text-xs mt-1">{errors.startHorimeter.message}</p>}
                   <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">Sugerido automaticamente com base no último fechamento.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Leitura Final (Opcional para Abertura)</label>
-                  <input {...register("endHorimeter", { setValueAs: v => v === "" ? "" : Number(v) })} type="number" min={formStartHorimeter || 0} step="0.1" className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 focus:ring-yellow-500 focus:border-yellow-500 font-mono" />
+                  <input {...register("endHorimeter", { setValueAs: (v) => (v === "" || v == null) ? "" : parseDecimal(v) })} type="text" inputMode="decimal" onInput={(e: any) => { const v = (e.currentTarget.value || '').replace(/[^\d.,-]/g, ''); if (v !== e.currentTarget.value) e.currentTarget.value = v; }} className="w-full p-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 focus:ring-yellow-500 focus:border-yellow-500 font-mono" />
                   {errors.endHorimeter && <p className="text-red-500 text-xs mt-1">{errors.endHorimeter.message}</p>}
                 </div>
                 

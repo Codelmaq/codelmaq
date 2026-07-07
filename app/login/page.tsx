@@ -21,11 +21,63 @@ import {
   Sparkles,
   Camera,
   RotateCcw,
-  Inspect
+  Inspect,
+  Crown,
+  Briefcase,
+  Truck,
+  Wrench,
+  HardHat
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { mapDBToEmployee } from '@/lib/mapper';
+import { UserRole, ROLE_LABELS, normalizeRole } from '@/types/auth';
+
+// Perfis oficiais exibidos no seletor de função do cadastro.
+// A chave (value) é o que vai para o banco; o label é o que o usuário vê.
+type RoleOption = {
+  value: UserRole;
+  label: string;
+  description: string;
+  Icon: React.ComponentType<{ className?: string }>;
+};
+
+const ROLE_OPTIONS: RoleOption[] = [
+  {
+    value: 'administrador',
+    label: ROLE_LABELS.administrador,
+    description: 'Acesso total ao sistema',
+    Icon: Crown,
+  },
+  {
+    value: 'gestor',
+    label: ROLE_LABELS.gestor,
+    description: 'Gestão de colaboradores, sem poderes administrativos',
+    Icon: Briefcase,
+  },
+  {
+    value: 'motorista',
+    label: ROLE_LABELS.motorista,
+    description: 'Condução de veículos e comboio',
+    Icon: Truck,
+  },
+  {
+    value: 'mecanico',
+    label: ROLE_LABELS.mecanico,
+    description: 'Oficina, manutenção e triagem',
+    Icon: Wrench,
+  },
+  {
+    value: 'operador',
+    label: ROLE_LABELS.operador,
+    description: 'Operação de máquinas pesadas',
+    Icon: HardHat,
+  },
+];
+
+// Helper: o role é "elevado" (admin OU gestor)? Eles aterrissam no /dashboard.
+const isElevatedRole = (role: UserRole): boolean =>
+  role === 'administrador' || role === 'gestor';
 
 // Web Audio API feedback
 const playBeep = (type: 'success' | 'double' | 'error' = 'success') => {
@@ -98,7 +150,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [nome, setNome] = useState('');
-  const [role, setRole] = useState<'administrador' | 'colaborador'>('colaborador');
+  const [role, setRole] = useState<UserRole>('operador');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -141,7 +193,8 @@ export default function LoginPage() {
         const parsed = JSON.parse(stored);
         if (parsed?.state?.usuario) {
           const u = parsed.state.usuario;
-          router.push(u.role === 'administrador' ? '/dashboard' : '/parte-diaria');
+          const uRole = normalizeRole(u.role);
+          router.push(isElevatedRole(uRole) ? '/dashboard' : '/parte-diaria');
         }
       } catch (err) {
         console.error('Error reading saved session:', err);
@@ -222,7 +275,7 @@ export default function LoginPage() {
           id: '11111111-1111-4111-b111-111111111111',
           nome: 'Carlos Silva (Operador)',
           email: 'operador@codelmaq.com.br',
-          role: 'colaborador' as const,
+          role: 'operador' as const,
           status: 'aprovado' as const
         };
         setUsuario(defaultColab);
@@ -256,6 +309,34 @@ export default function LoginPage() {
         setUsuario(defaultMecanico);
         playBeep('success');
         router.push('/parte-diaria');
+        return;
+      }
+
+      if (email.toLowerCase() === 'motorista@codelmaq.com.br' && password === '123456') {
+        const defaultMotorista = {
+          id: '33333333-3333-4333-b333-333333333333',
+          nome: 'Marcos Pereira (Motorista)',
+          email: 'motorista@codelmaq.com.br',
+          role: 'motorista' as const,
+          status: 'aprovado' as const
+        };
+        setUsuario(defaultMotorista);
+        playBeep('success');
+        router.push('/parte-diaria');
+        return;
+      }
+
+      if (email.toLowerCase() === 'gestor@codelmaq.com.br' && password === '123456') {
+        const defaultGestor = {
+          id: '44444444-4444-4444-b444-444444444444',
+          nome: 'Luciana Gestora',
+          email: 'gestor@codelmaq.com.br',
+          role: 'gestor' as const,
+          status: 'aprovado' as const
+        };
+        setUsuario(defaultGestor);
+        playBeep('success');
+        router.push('/dashboard');
         return;
       }
 
@@ -306,11 +387,13 @@ export default function LoginPage() {
             } else {
               // Truly new user — apply default role.
               const isOwner = data.user.email?.toLowerCase() === 'ale.codelmaq1986@gmail.com';
+              const ownerRole: UserRole = 'administrador';
+              const defaultRole: UserRole = 'operador';
               const newPerfil = {
                 id: data.user.id,
                 nome: data.user.email?.split('@')[0] || 'Usuário',
                 email: data.user.email,
-                funcao: isOwner ? ('administrador' as const) : ('colaborador' as const),
+                funcao: isOwner ? ownerRole : defaultRole,
                 status: isOwner ? ('aprovado' as const) : ('pendente' as const)
               };
 
@@ -331,10 +414,15 @@ export default function LoginPage() {
 
           if (perfil) {
             const mappedUser = mapDBToEmployee(perfil);
-            setUsuario(mappedUser);
+            // Normaliza o role vindo do banco (pode estar com label antigo) para uma das 5 chaves oficiais.
+            const normalizedUser = {
+              ...mappedUser,
+              role: normalizeRole(mappedUser.role),
+            };
+            setUsuario(normalizedUser);
             playBeep('success');
-            if (mappedUser.status === 'aprovado') {
-              router.push(mappedUser.role === 'administrador' ? '/dashboard' : '/parte-diaria');
+            if (normalizedUser.status === 'aprovado') {
+              router.push(isElevatedRole(normalizedUser.role) ? '/dashboard' : '/parte-diaria');
             } else {
               router.push('/aguardando-aprovacao');
             }
@@ -364,6 +452,7 @@ export default function LoginPage() {
           const profileData = {
             id: data.user.id,
             nome,
+            funcao: role,
             role,
             status: 'pendente' as const,
             email: email
@@ -377,7 +466,7 @@ export default function LoginPage() {
             console.error('Database user mapping error:', insertError);
           }
 
-          setSuccessMessage('Sua conta foi submetida com sucesso! Aguarde a aprovação de um Administrador.');
+          setSuccessMessage(`Sua conta foi submetida como ${ROLE_LABELS[role]}! Aguarde a aprovação de um Administrador.`);
           setIsLogin(true);
           playBeep('double');
           setEmail('');
@@ -519,7 +608,7 @@ export default function LoginPage() {
         id: '11111111-1111-4111-b111-111111111111',
         nome: 'Carlos Silva',
         email: 'operador@codelmaq.com.br',
-        role: 'colaborador' as const,
+        role: 'operador' as const,
         status: 'aprovado' as const
       }
     },
@@ -534,6 +623,34 @@ export default function LoginPage() {
         nome: 'Roberto Mecânico',
         email: 'mecanico@codelmaq.com.br',
         role: 'mecanico' as const,
+        status: 'aprovado' as const
+      }
+    },
+    {
+      code: 'CODELMAQ-GES-004',
+      title: 'Crachá de Luciana Gestora',
+      subtitle: 'Gestão de Equipes e Relatórios',
+      color: 'from-purple-500 to-fuchsia-600',
+      tag: 'GESTOR',
+      user: {
+        id: '44444444-4444-4444-b444-444444444444',
+        nome: 'Luciana Gestora',
+        email: 'gestor@codelmaq.com.br',
+        role: 'gestor' as const,
+        status: 'aprovado' as const
+      }
+    },
+    {
+      code: 'CODELMAQ-MOT-005',
+      title: 'Crachá de Marcos Pereira',
+      subtitle: 'Motorista • Caminhões e Comboio',
+      color: 'from-emerald-500 to-teal-600',
+      tag: 'MOTORISTA',
+      user: {
+        id: '33333333-3333-4333-b333-333333333333',
+        nome: 'Marcos Pereira',
+        email: 'motorista@codelmaq.com.br',
+        role: 'motorista' as const,
         status: 'aprovado' as const
       }
     },
@@ -565,18 +682,16 @@ export default function LoginPage() {
       setIsScanning(false);
       setScanResult(badge);
       
-      if ('user' in badge) {
+      if ('user' in badge && badge.user) {
         // Double beep on scan matches
         playBeep('double');
-        
+
         // Auto sign in user after successful operator crachá reading
         setTimeout(() => {
-          setUsuario(badge.user);
-          router.push(
-            badge.user.funcao === 'administrador' 
-              ? '/dashboard' 
-              : '/parte-diaria'
-          );
+          const badgeUser = badge.user!;
+          const normalizedRole = normalizeRole(badgeUser.role);
+          setUsuario({ ...badgeUser, role: normalizedRole });
+          router.push(isElevatedRole(normalizedRole) ? '/dashboard' : '/parte-diaria');
         }, 1200);
       } else {
         // Scanning equipment - double beep for recognition
@@ -846,30 +961,36 @@ export default function LoginPage() {
                   {/* Role picker for new accounts */}
                   {!isLogin && !isForgotPassword && !isUpdatingPassword && (
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[#9ca3af]">Função Operativa Requerida</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setRole('colaborador')}
-                          className={`py-2 px-3 border rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                            role === 'colaborador' 
-                              ? 'bg-yellow-500/15 border-[#eab308] text-[#eab308] shadow-[0_0_10px_rgba(161,122,240,0.1)] light:bg-[#eab308]/10 light:border-[#eab308]' 
-                              : 'bg-transparent border-white/10 text-[#9ca3af] hover:border-white/20 light:border-[#6b7280]/20 light:text-[#6b7280]'
-                          }`}
-                        >
-                          Colaborador / Operador
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRole('administrador')}
-                          className={`py-2 px-3 border rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                            role === 'administrador' 
-                              ? 'bg-yellow-500/15 border-[#eab308] text-[#eab308] shadow-[0_0_10px_rgba(161,122,240,0.1)] light:bg-[#eab308]/10 light:border-[#eab308]' 
-                              : 'bg-transparent border-white/10 text-[#9ca3af] hover:border-white/20 light:border-[#6b7280]/20 light:text-[#6b7280]'
-                          }`}
-                        >
-                          Gestor / Administrador
-                        </button>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-[#9ca3af]">
+                        Função Requerida
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {ROLE_OPTIONS.map((opt) => {
+                          const selected = role === opt.value;
+                          const Icon = opt.Icon;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setRole(opt.value)}
+                              className={`flex items-center gap-3 p-2.5 border rounded-xl text-left transition-all cursor-pointer ${
+                                selected
+                                  ? 'bg-yellow-500/15 border-[#eab308] text-[#eab308] shadow-[0_0_10px_rgba(161,122,240,0.15)] light:bg-[#eab308]/10 light:border-[#eab308]'
+                                  : 'bg-transparent border-white/10 text-[#9ca3af] hover:border-white/20 light:border-[#6b7280]/20 light:text-[#6b7280]'
+                              }`}
+                            >
+                              <Icon className={`h-4 w-4 flex-shrink-0 ${selected ? 'text-[#eab308]' : 'text-[#9ca3af]'}`} />
+                              <div className="min-w-0 flex-1">
+                                <p className={`text-[11px] font-extrabold uppercase tracking-wider ${selected ? 'text-[#eab308]' : 'text-white light:text-[#1a1a2e]'}`}>
+                                  {opt.label}
+                                </p>
+                                <p className="text-[10px] text-[#9ca3af] leading-snug truncate">
+                                  {opt.description}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1098,7 +1219,9 @@ export default function LoginPage() {
                           </div>
                           <div>
                             <p className="text-[10px] uppercase font-bold text-[#9ca3af]">Função</p>
-                            <p className="text-xs font-semibold text-[#eab308] light:text-[#eab308] uppercase mt-0.5">{scanResult.user.role}</p>
+                            <p className="text-xs font-semibold text-[#eab308] light:text-[#eab308] uppercase mt-0.5">
+                              {ROLE_LABELS[normalizeRole(scanResult.user.role)] || scanResult.user.role}
+                            </p>
                           </div>
                           <div className="col-span-2 pt-2 border-t border-white/5 flex items-center gap-2">
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-[#eab308]" />

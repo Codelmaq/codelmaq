@@ -179,7 +179,7 @@ export const mapEmployeeToDB = (e: any) => ({
   id: ensureUUID(e.id) || genId(),
   nome: e.nome || e.name || 'Sem Nome',
   email: e.email || null,
-  funcao: e.funcao || e.role || 'colaborador',
+  funcao: e.funcao || e.role || 'operador',
   status: e.status || 'aprovado'
 });
 
@@ -243,6 +243,66 @@ export const mapDBToChecklist = (db: any) => ({
   status: db.status,
   answers: db.respostas,
   observacoes: db.observacoes,
+  synced: 1
+});
+
+export const mapBonusToDB = (b: any) => ({
+  id: ensureUUID(b.id) || genId(),
+  operador_id: ensureUUID(b.operatorId || b.operador_id),
+  operador_nome: b.operatorName || b.operador_nome || null,
+  codigo_bonificacao: b.rewardCode || b.codigo_bonificacao,
+  descricao: b.rewardLabel || b.descricao || 'Bonificação',
+  pontos: ensureNumber(b.points || b.pontos) ?? 0,
+  foto_evidencia: b.photoEvidencia || b.foto_evidencia || null,
+  observacoes: b.observacoes || null,
+  aplicado_por: ensureUUID(b.aplicadoPor || b.aplicado_por),
+  aplicado_por_nome: b.aplicadoPorNome || b.aplicado_por_nome || null,
+  data_evento: b.dataEvento || b.data_evento || new Date().toISOString()
+});
+
+export const mapDBToBonus = (db: any) => ({
+  id: db.id,
+  operatorId: db.operador_id,
+  operatorName: db.operador_nome,
+  rewardCode: db.codigo_bonificacao,
+  rewardLabel: db.descricao,
+  points: db.pontos,
+  photoEvidencia: db.foto_evidencia,
+  observacoes: db.observacoes,
+  aplicadoPor: db.aplicado_por,
+  aplicadoPorNome: db.aplicado_por_nome,
+  dataEvento: db.data_evento,
+  createdAt: db.criado_em,
+  synced: 1
+});
+
+export const mapPenaltyToDB = (p: any) => ({
+  id: ensureUUID(p.id) || genId(),
+  operador_id: ensureUUID(p.operatorId || p.operador_id),
+  operador_nome: p.operatorName || p.operador_nome || null,
+  codigo_infracao: p.infractionCode || p.codigo_infracao,
+  descricao: p.infractionLabel || p.descricao || 'Infração',
+  pontos: ensureNumber(p.points || p.pontos) ?? 0,
+  foto_evidencia: p.photoEvidencia || p.foto_evidencia,
+  observacoes: p.observacoes || null,
+  aplicado_por: ensureUUID(p.aplicadoPor || p.aplicado_por),
+  aplicado_por_nome: p.aplicadoPorNome || p.aplicado_por_nome || null,
+  data_evento: p.dataEvento || p.data_evento || new Date().toISOString()
+});
+
+export const mapDBToPenalty = (db: any) => ({
+  id: db.id,
+  operatorId: db.operador_id,
+  operatorName: db.operador_nome,
+  infractionCode: db.codigo_infracao,
+  infractionLabel: db.descricao,
+  points: db.pontos,
+  photoEvidencia: db.foto_evidencia,
+  observacoes: db.observacoes,
+  aplicadoPor: db.aplicado_por,
+  aplicadoPorNome: db.aplicado_por_nome,
+  dataEvento: db.data_evento,
+  createdAt: db.criado_em,
   synced: 1
 });
 
