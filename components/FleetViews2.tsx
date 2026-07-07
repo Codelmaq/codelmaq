@@ -351,7 +351,6 @@ type DailyLogFormData = z.infer<typeof dailyLogSchema>;
 export const DailyLogView = ({ logs = [], machines = [], employees = [], sites = [], onAddLog, onEditLog, onDeleteLog, isAdminAuthenticated }: any) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [aiModal, setAiModal] = useState({ isOpen: false, text: '', isLoading: false, error: '' });
   
   const [formStartHorimeter, setFormStartHorimeter] = useState<string | number>('');
   const [formPhotos, setFormPhotos] = useState<string[]>([]);
@@ -437,19 +436,6 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
     link.click();
     document.body.removeChild(link);
   }, [filteredLogs, getOperatorName]);
-
-  const handleAnalyzeLogs = async () => {
-    setAiModal({ isOpen: true, text: '', isLoading: true, error: '' });
-    const logsText = logs.map((l: any) => `[${l.machineId}] Operador ${getOperatorName(l.operator)} relatou: ${l.observations}`).join('\n');
-    const prompt = `Atue como um gestor de frotas experiente. Analise as observações das partes diárias abaixo e destaque os riscos ou problemas mecânicos que precisam de atenção urgente para evitar que as máquinas quebrem. Formate a resposta de forma clara, com tópicos e recomendações de ações preventivas.\n\nObservações do dia:\n${logsText}`;
-    
-    try {
-      const text = await generateWithGemini(prompt);
-      setAiModal(prev => ({ ...prev, text, isLoading: false }));
-    } catch (error) {
-      setAiModal(prev => ({ ...prev, error: 'Falha ao analisar os relatórios. Tente novamente.', isLoading: false }));
-    }
-  };
 
   const openEditModal = (log: any) => {
     setEditingLog(log);
@@ -572,27 +558,8 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                 <Download size={18} className="mr-2" />
                 Exportar PDF
               </button>
-              <button 
-                onClick={handleAnalyzeLogs}
-                className="bg-yellow-50 hover:bg-yellow-100 text-yellow-700 font-semibold py-2 px-4 rounded-lg flex items-center transition-colors border border-yellow-200"
-              >
-                <Sparkles size={18} className="mr-2" />
-                Análise Inteligente
-              </button>
             </>
           )}
-          <button 
-            onClick={() => {
-              setEditingLog(null);
-              setFormStartHorimeter('');
-              setFormPhotos([]);
-              setIsModalOpen(true);
-            }}
-            className="bg-yellow-500 hover:bg-yellow-600 text-yellow-950 font-semibold py-2 px-4 rounded-lg flex items-center transition-colors"
-          >
-            <Plus size={18} className="mr-2" />
-            Preencher Parte Diária
-          </button>
         </div>
       </div>
 
@@ -851,45 +818,9 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
         </div>
       )}
 
-      {aiModal.isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#151515] rounded-xl shadow-xl w-full max-w-2xl max-w-[90vw] flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-white/5">
-              <div className="flex items-center space-x-2 text-yellow-700">
-                <Sparkles size={24} />
-                <h3 className="text-xl font-bold">Resumo Diário da Frota</h3>
-              </div>
-              <button onClick={() => setAiModal({ isOpen: false, text: '', isLoading: false, error: '' })} className="text-gray-400 hover:text-gray-600 dark:text-gray-300">
-                <X size={24} />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto flex-1">
-              {aiModal.isLoading ? (
-                <div className="flex flex-col items-center justify-center py-12 text-yellow-600">
-                  <Loader2 size={40} className="animate-spin mb-4" />
-                  <p className="font-medium text-gray-600 dark:text-gray-300">A IA está analisando os registros...</p>
-                </div>
-              ) : aiModal.error ? (
-                <div className="p-4 bg-red-50 text-red-700 rounded-lg flex items-center">
-                  <AlertTriangle size={20} className="mr-2" />
-                  {aiModal.error}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
-                  {aiModal.text}
-                </div>
-              )}
-            </div>
-            
-            <div className="p-6 border-t border-gray-100 dark:border-white/5 bg-gray-50 dark:bg-[#101010] rounded-b-xl flex justify-end">
-              <button onClick={() => setAiModal({ isOpen: false, text: '', isLoading: false, error: '' })} className="px-4 py-2 bg-gray-200 text-gray-800 dark:text-gray-100 font-semibold rounded-md hover:bg-gray-300 transition-colors">
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      
+
+      
 
       {/* Open Shift Confirmation Modal */}
       {openShiftConfirm.isOpen && (

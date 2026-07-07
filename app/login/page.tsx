@@ -1105,7 +1105,18 @@ export default function LoginPage() {
 
                 {/* Switch panel buttons */}
                 <div className="flex flex-col space-y-3 pt-4 border-t border-white/5">
-                  <div className="grid grid-cols-2 gap-4 text-xs">
+                  {isForgotPassword ? (
+                    <button
+                      onClick={() => {
+                        setIsForgotPassword(false);
+                        setError(null);
+                        setSuccessMessage(null);
+                      }}
+                      className="w-full text-center text-[#9ca3af] hover:text-[#eab308] hover:underline cursor-pointer py-2 text-xs font-bold uppercase tracking-wider"
+                    >
+                      ← Voltar para Login
+                    </button>
+                  ) : (
                     <button
                       onClick={() => {
                         setIsLogin(!isLogin);
@@ -1114,23 +1125,16 @@ export default function LoginPage() {
                         setError(null);
                         setSuccessMessage(null);
                       }}
-                      className="text-center font-bold text-[#eab308] hover:underline cursor-pointer light:text-[#eab308]"
+                      className={`w-full flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-xl text-sm font-bold uppercase tracking-wider transition-all border ${
+                        isLogin
+                          ? 'bg-[#eab308]/15 hover:bg-[#eab308]/25 text-[#eab308] border-[#eab308]/50 shadow-[0_4px_18px_rgba(234,179,8,0.2)] hover:shadow-[0_4px_24px_rgba(234,179,8,0.35)] hover:border-[#eab308]'
+                          : 'bg-transparent text-[#9ca3af] hover:text-white border-white/10 hover:border-white/30'
+                      }`}
                     >
-                      {isLogin ? 'Solicitar Cadastro' : 'Fazer Login Existing'}
+                      <UserPlus size={16} />
+                      {isLogin ? 'Solicitar Cadastro' : 'Já tenho conta — Fazer Login'}
                     </button>
-                    {isForgotPassword && (
-                      <button
-                        onClick={() => {
-                          setIsForgotPassword(false);
-                          setError(null);
-                          setSuccessMessage(null);
-                        }}
-                        className="text-center text-[#9ca3af] hover:underline cursor-pointer"
-                      >
-                        Voltar para Login
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </motion.div>
             )}
