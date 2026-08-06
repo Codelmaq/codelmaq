@@ -6,7 +6,7 @@ const ensureNumber = (val: any) => {
   return isNaN(num) ? null : num;
 };
 
-const ensureUUID = (val: any) => {
+export const ensureUUID = (val: any) => {
   if (!val || typeof val !== 'string') return null;
   const cleanVal = val.trim();
   if (cleanVal === '-' || cleanVal === '') return null;

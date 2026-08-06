@@ -1,4 +1,4 @@
-import { mapDBToMachine, mapMachineToDB, mapDBToLog, mapLogToDB, mapDBToRefill, mapRefillToDB, mapDBToPlan, mapPlanToDB, mapDBToMaintenances, mapMaintenancesToDB, mapDBToEmployee, mapEmployeeToDB, mapSiteToDB, mapDBToSite, mapDBToTemplate, mapTemplateToDB, mapChecklistToDB, mapDBToChecklist, mapBonusToDB, mapDBToBonus, mapPenaltyToDB, mapDBToPenalty } from '@/lib/mapper';
+import { mapDBToMachine, mapMachineToDB, mapDBToLog, mapLogToDB, mapDBToRefill, mapRefillToDB, mapDBToPlan, mapPlanToDB, mapDBToMaintenances, mapMaintenancesToDB, mapDBToEmployee, mapEmployeeToDB, mapSiteToDB, mapDBToSite, mapDBToTemplate, mapTemplateToDB, mapChecklistToDB, mapDBToChecklist, mapBonusToDB, mapDBToBonus, mapPenaltyToDB, mapDBToPenalty, ensureUUID } from '@/lib/mapper';
 import { localDb, LocalChecklist, LocalRegistroDiario, LocalUser, LocalBonus, LocalPenalty } from './localDb';
 import { supabase } from './supabase';
 import { connectivityService } from './connectivity';
@@ -399,8 +399,8 @@ class CodelmaqSyncEngine {
               const fallbackPayload: any = {
                 id: workingId,
                 ativo_id: localReg.machineId,
-                operador_id: localReg.operatorId,
-                frente_servico_id: localReg.siteId,
+                operador_id: ensureUUID(localReg.operatorId),
+                frente_servico_id: ensureUUID(localReg.siteId),
                 data: localReg.data,
                 horimetro_inicial: localReg.horimetroInicial,
                 horimetro_final: localReg.horimetroFinal,

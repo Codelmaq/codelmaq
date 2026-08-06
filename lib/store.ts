@@ -125,7 +125,7 @@ export const useFleetStore = create<FleetState>()(
                 // Fallback for missing columns
                 if (error.message.includes("column") && 
                    (error.message.includes("openedAt") || error.message.includes("closedAt") || error.message.includes("status") || error.message.includes("fuelSource"))) {
-                  const fallbackLog = { ...item.dados };
+                  const fallbackLog = { ...mapLogToDB(item.dados as any) };
                   delete fallbackLog.openedAt;
                   delete fallbackLog.closedAt;
                   delete fallbackLog.status;

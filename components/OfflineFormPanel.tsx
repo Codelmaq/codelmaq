@@ -413,7 +413,7 @@ export function OfflineFormPanel({
           machineId,
           siteId:
             siteId ||
-            (typeof sites[0] === 'string' ? sites[0] : (sites[0] as any)?.nome || (sites[0] as any)?.name) ||
+            (typeof sites[0] === 'string' ? sites[0] : (sites[0] as any)?.id || (sites[0] as any)?.nome || (sites[0] as any)?.name) ||
             '',
           data: today,
           horimetroInicial,
@@ -493,7 +493,7 @@ export function OfflineFormPanel({
         machineId,
         siteId:
           siteId ||
-          (typeof sites[0] === 'string' ? sites[0] : (sites[0] as any)?.nome || (sites[0] as any)?.name) ||
+          (typeof sites[0] === 'string' ? sites[0] : (sites[0] as any)?.id || (sites[0] as any)?.nome || (sites[0] as any)?.name) ||
           '',
         data: today,
         horimetroInicial,
@@ -674,7 +674,7 @@ export function OfflineFormPanel({
         machineType: machine?.type || '',
         operatorId: currentUserProfile.id,
         operatorName: currentUserProfile.nome,
-        siteId: (typeof sites[0] === 'string' ? sites[0] : (sites[0] as any)?.nome || (sites[0] as any)?.name) || '',
+        siteId: (typeof sites[0] === 'string' ? sites[0] : (sites[0] as any)?.id || (sites[0] as any)?.nome || (sites[0] as any)?.name) || '',
         horimetroInicial: data.horimetroInicial,
         // horimetroFinal intentionally left undefined until the shift is closed.
         fuelAdded: 0,
@@ -913,7 +913,7 @@ export function OfflineFormPanel({
                 className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 text-lg md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-medium"
               >
                 {sites.map((st: any, idx: number) => (
-                  <option key={st.id || idx} value={st.nome || st.name || st}>
+                  <option key={st.id || idx} value={st.id || st.nome || st.name || st}>
                     {st.nome || st.name || st}
                   </option>
                 ))}
