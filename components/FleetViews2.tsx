@@ -379,7 +379,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
 
   const filteredLogs = useMemo(() => {
     return logs.filter((l: any) => 
-      (l.status === 'Concluído' || !l.status) && (
+      (l.status === 'Concluído' || l.status === 'fechado' || !l.status) && (
         l.machineId.toLowerCase().includes(searchTerm.toLowerCase()) || 
         getOperatorName(l.operator).toLowerCase().includes(searchTerm.toLowerCase())
       )
@@ -839,7 +839,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                 onClick={() => {
                   const machineId = openShiftConfirm.log.machineId;
                   const machine = machines.find((m: any) => m.id === machineId);
-                  const completedLogs = logs.filter((l: any) => l.machineId === machineId && l.status === 'Concluído');
+                  const completedLogs = logs.filter((l: any) => l.machineId === machineId && (l.status === 'Concluído' || l.status === 'fechado'));
                   const lastLog = completedLogs.length > 0 
                     ? [...completedLogs].sort((a: any, b: any) => safeTimeOf(b.date) - safeTimeOf(a.date))[0]
                     : null;
@@ -926,7 +926,7 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                       }
                       
                       // Find the last completed log for this machine to suggest the starting horimeter
-                      const completedLogs = logs.filter((l: any) => l.machineId === machineId && l.status === 'Concluído');
+                      const completedLogs = logs.filter((l: any) => l.machineId === machineId && (l.status === 'Concluído' || l.status === 'fechado'));
                       const lastLog = completedLogs.length > 0 
                         ? [...completedLogs].sort((a: any, b: any) => {
                             const dateA = safeTimeOf(a.date);
