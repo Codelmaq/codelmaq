@@ -412,6 +412,15 @@ export function OfflineFormPanel({
           });
           return;
         }
+        if (!Number.isFinite(horimetroInicial) || horimetroInicial < 0) {
+          playError();
+          feedback.showWithSound({
+            kind: 'error',
+            title: 'Horímetro inicial inválido',
+            errorMessage: 'Digite o valor que aparece no painel da máquina no início do serviço.',
+          });
+          return;
+        }
         if (horimetroFinal < horimetroInicial) {
           playError();
           feedback.showWithSound({
@@ -1029,7 +1038,6 @@ export function OfflineFormPanel({
                 <input
                   type="text"
                   inputMode="decimal"
-                  required
                   ref={horimetroInicialRef}
                   onInput={(e) => {
                     // Strip anything that isn't a digit/comma/period so pt-BR "30,5"
@@ -1061,7 +1069,6 @@ export function OfflineFormPanel({
                 <input
                   type="text"
                   inputMode="decimal"
-                  required
                   ref={horimetroFinalRef}
                   onInput={(e) => {
                     const original = e.currentTarget.value;
