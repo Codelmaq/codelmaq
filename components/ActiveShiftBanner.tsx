@@ -67,27 +67,27 @@ export function ActiveShiftBanner() {
             exit={{ y: -120, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 240, damping: 24 }}
             data-testid="active-shift-banner"
-            className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-2xl shadow-red-500/40 ring-4 ring-yellow-300/40 relative overflow-hidden"
-          >
-            {/* Animated pulse border */}
-            <motion.div
-              animate={{ opacity: [0.35, 0.7, 0.35] }}
-              transition={{ duration: 1.8, repeat: Infinity }}
-              className="absolute inset-0 pointer-events-none ring-4 ring-yellow-300/40 rounded-none"
-            />
+className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30 relative overflow-hidden"
+            >
+              {/* Animated pulse border */}
+              <motion.div
+                animate={{ opacity: [0.25, 0.5, 0.25] }}
+                transition={{ duration: 1.8, repeat: Infinity }}
+                className="absolute inset-0 pointer-events-none ring-2 ring-yellow-300/30 rounded-none"
+              />
 
             {/* Big banner content */}
-            <div className="max-w-7xl mx-auto px-4 py-4 md:py-5 flex items-center justify-between gap-3 flex-wrap relative">
-              <div className="flex items-center gap-3 md:gap-5 min-w-0 flex-1">
+            <div className="max-w-7xl mx-auto px-3 md:px-4 py-2.5 md:py-3 flex items-center justify-between gap-3 flex-wrap relative">
+              <div className="flex items-center gap-2.5 md:gap-3 min-w-0 flex-1">
                 {/* Pulse icon */}
                 <motion.div
-                  animate={{ scale: [1, 1.08, 1] }}
+                  animate={{ scale: [1, 1.06, 1] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
-                  className="relative flex items-center justify-center w-14 h-14 md:w-20 md:h-20 rounded-full bg-white/25 ring-4 ring-white/40 flex-shrink-0"
+                  className="relative flex items-center justify-center w-9 h-9 md:w-11 md:h-11 rounded-full bg-white/25 ring-2 ring-white/40 flex-shrink-0"
                 >
-                  <Activity className="w-7 h-7 md:w-10 md:h-10" />
+                  <Activity className="w-4.5 h-4.5 md:w-5 md:h-5" />
                   <motion.span
-                    animate={{ scale: [1, 1.7, 1], opacity: [0.7, 0, 0.7] }}
+                    animate={{ scale: [1, 1.6, 1], opacity: [0.7, 0, 0.7] }}
                     transition={{ duration: 1.5, repeat: Infinity }}
                     className="absolute inset-0 rounded-full bg-white/30"
                   />
@@ -95,30 +95,30 @@ export function ActiveShiftBanner() {
 
                 {/* Text block */}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-[11px] md:text-sm uppercase tracking-widest font-black opacity-95">
+                  <div className="flex items-center gap-1.5 text-[10px] md:text-xs uppercase tracking-widest font-black opacity-95">
                     <motion.span
                       animate={{ opacity: [1, 0.35, 1] }}
                       transition={{ duration: 1, repeat: Infinity }}
-                      className="w-2.5 h-2.5 rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50"
+                      className="w-2 h-2 rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50"
                     />
                     TURNO EM ABERTO — FECHAMENTO PENDENTE
                   </div>
-                  <div className="flex items-baseline gap-2 md:gap-4 mt-1 flex-wrap">
-                    <span className="text-3xl md:text-5xl font-black font-mono tabular-nums tracking-wider drop-shadow-lg">
+                  <div className="flex items-baseline gap-2 md:gap-3 mt-0.5 flex-wrap">
+                    <span className="text-lg md:text-2xl font-black font-mono tabular-nums tracking-wider drop-shadow-lg">
                       {elapsed}
                     </span>
-                    <span className="hidden sm:inline text-base opacity-70">•</span>
-                    <span className="text-base md:text-2xl font-bold flex items-center gap-1.5 truncate">
-                      <Truck size={18} className="md:size-6 flex-shrink-0" />
+                    <span className="hidden sm:inline text-xs opacity-70">•</span>
+                    <span className="text-sm md:text-base font-bold flex items-center gap-1.5 truncate">
+                      <Truck size={15} className="md:size-4.5 flex-shrink-0" />
                       <span className="truncate">{activeShift.machineId}</span>
                     </span>
                     {activeShift.machineName && (
-                      <span className="hidden md:inline text-base opacity-90 truncate">
+                      <span className="hidden md:inline text-sm opacity-90 truncate">
                         — {activeShift.machineName}
                       </span>
                     )}
                   </div>
-                  <div className="hidden sm:flex items-center gap-2 mt-1 text-[11px] md:text-sm opacity-90 flex-wrap">
+                  <div className="hidden sm:flex items-center gap-2 mt-0.5 text-[11px] md:text-xs opacity-90 flex-wrap">
                     <Clock size={12} />
                     <span>
                       Abertura: <span className="font-mono font-black">{dataInicioBR} às {horaInicioBR}</span>
@@ -136,19 +136,19 @@ export function ActiveShiftBanner() {
                 <button
                   type="button"
                   onClick={() => setEndModalOpen(true)}
-                  className="px-4 py-3 md:px-6 md:py-3.5 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-xl text-sm md:text-base uppercase tracking-wider flex items-center gap-2 transition-all shadow-xl cursor-pointer"
+                  className="px-3.5 py-2 md:px-5 md:py-2.5 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-lg text-xs md:text-sm uppercase tracking-wider flex items-center gap-2 transition-all shadow-xl cursor-pointer"
                 >
-                  <Square size={14} fill="currentColor" />
+                  <Square size={13} fill="currentColor" />
                   Encerrar Turno
                 </button>
                 <button
                   type="button"
                   onClick={() => setMinimized(true)}
-                  className="p-2.5 md:p-3 hover:bg-white/15 rounded-xl transition-colors cursor-pointer"
+                  className="p-2 md:p-2.5 hover:bg-white/15 rounded-lg transition-colors cursor-pointer"
                   aria-label="Minimizar banner"
                   title="Minimizar (não encerra o turno)"
                 >
-                  <Minimize2 size={18} />
+                  <Minimize2 size={16} />
                 </button>
               </div>
             </div>
