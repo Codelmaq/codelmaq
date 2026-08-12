@@ -124,6 +124,35 @@ export function SyncIndicator({ compact = false, machines = [], employees = [] }
     }
   };
 
+  // Removes only records linked to the fake dev-seed admin UUID, keeping real user data.
+  const handleDiscardFakeSeedRecords = async () => {
+    const FAKE_UUID = '00000000-0000-4000-a000-000000000000';
+    try {
+      const [chk, logs, penalties, bonuses] = await Promise.all([
+        localDb.checklists.where('supervisorId').equals(FAKE_UUID).toArray(),
+        localDb.registrosDiarios.where('operatorId').equals(FAKE_UUID).toArray(),
+        localDb.penalties.where('operatorId').equals(FAKE_UUID).toArray(),
+        localDb.bonuses.where('operatorId').equals(FAKE_UUID).toArray(),
+      ]);
+      const total = chk.length + logs.length + penalties.length + bonuses.length;
+      if (total === 0) {
+        alert('Nenhum registro antigo vinculado ao usuário de desenvolvimento (seed) na fila local.');
+        return;
+      }
+      if (!confirm(`Remover ${total} registro(s) antigo(s) do seed de desenvolvimento da fila local?\n\nRegistros vinculados a usuários reais NÃO serão afetados.`)) return;
+
+      for (const c of chk) await localDb.checklists.delete(c.id);
+      for (const l of logs) await localDb.registrosDiarios.delete(l.id);
+      for (const p of penalties) await localDb.penalties.delete(p.id);
+      for (const b of bonuses) await localDb.bonuses.delete(b.id);
+
+      await syncEngine.countPendingRecords();
+      alert(`${total} registro(s) antigo(s) de desenvolvimento removido(s) da fila local.`);
+    } catch (e) {
+      console.error('Discard-fake-seed error:', e);
+    }
+  };
+
   const hasPending = syncStatus.totalPending > 0;
 
   return (
@@ -293,6 +322,13 @@ export function SyncIndicator({ compact = false, machines = [], employees = [] }
 
       {/* Manual Cleanup of Corrupted Data */}
       <div className="space-y-1 pt-1">
+        <button 
+          onClick={handleDiscardFakeSeedRecords}
+          className="w-full text-[9px] text-amber-600 hover:text-amber-800 dark:text-amber-500 dark:hover:text-amber-400 underline text-center cursor-pointer"
+          title="Remove apenas registros vinculados ao usuário de desenvolvimento (UUID falso) que ficaram retidos na fila local"
+        >
+          Zerar Fila Local (remover registros antigos de desenvolvimento)
+        </button>
         <button 
           onClick={async () => {
             if (confirm(
