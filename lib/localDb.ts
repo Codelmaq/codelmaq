@@ -91,6 +91,8 @@ export interface LocalRegistroDiario {
   created_at?: string;
   checklistId?: string; // linked checklist id
   photos?: string[];    // Compressed image base64 URIs saved locally
+  fotoHorimetroInicial?: string; // photo of the initial horimeter (required to open)
+  fotoHorimetroFinal?: string;   // photo of the final horimeter (required to close)
   // Device clock timestamps captured on scan and on close
   horaInicio?: string;  // ISO timestamp set on QR scan / shift start
   horaFim?: string;     // ISO timestamp set on shift end

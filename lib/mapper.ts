@@ -73,7 +73,9 @@ export const mapLogToDB = (l: any) => ({
   observacoes: l.observations || l.observacoes,
   aberto_em: l.openedAt || l.aberto_em || l.horaInicio,
   fechado_em: l.closedAt || l.fechado_em || l.horaFim || l.fechadoEm,
-  fotos: Array.isArray(l.photos) && l.photos.length > 0 ? l.photos : null
+  fotos: Array.isArray(l.photos) && l.photos.length > 0 ? l.photos : null,
+  foto_horimetro_inicial: l.fotoHorimetroInicial || l.foto_horimetro_inicial || null,
+  foto_horimetro_final: l.fotoHorimetroFinal || l.foto_horimetro_final || null
 });
 
 export const mapDBToLog = (db: any) => ({
@@ -93,7 +95,9 @@ export const mapDBToLog = (db: any) => ({
   observations: db.observacoes,
   openedAt: db.aberto_em,
   closedAt: db.fechado_em,
-  photos: Array.isArray(db.fotos) ? db.fotos : []
+  photos: Array.isArray(db.fotos) ? db.fotos : [],
+  fotoHorimetroInicial: db.foto_horimetro_inicial || null,
+  fotoHorimetroFinal: db.foto_horimetro_final || null
 });
 
 export const mapRefillToDB = (r: any) => ({

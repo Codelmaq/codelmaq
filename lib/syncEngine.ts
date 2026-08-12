@@ -411,6 +411,16 @@ class CodelmaqSyncEngine {
             if (uploaded.length > 0) finalPayload.fotos = uploaded;
           }
 
+          // Upload dedicated horimeter photos (initial + final) to storage.
+          if (localReg.fotoHorimetroInicial) {
+            const uploaded = await this.uploadPhotos([localReg.fotoHorimetroInicial], `registros/${workingId}`);
+            if (uploaded.length > 0) finalPayload.foto_horimetro_inicial = uploaded[0];
+          }
+          if (localReg.fotoHorimetroFinal) {
+            const uploaded = await this.uploadPhotos([localReg.fotoHorimetroFinal], `registros/${workingId}`);
+            if (uploaded.length > 0) finalPayload.foto_horimetro_final = uploaded[0];
+          }
+
           const { error } = await supabase
             .from('registros_diarios')
             .upsert(finalPayload);

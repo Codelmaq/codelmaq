@@ -689,6 +689,13 @@ export const DailyLogView = ({ logs = [], machines = [], employees = [], sites =
                       </td>
                       <td className="p-4 text-sm text-gray-600 dark:text-gray-300 max-w-xs">
                         <div className="truncate" title={log.observations}>{log.observations || '-'}</div>
+                        {(log.fotoHorimetroInicial || log.fotoHorimetroFinal) && (
+                          <div className="flex items-center gap-1 mt-1 text-[10px] text-emerald-600 font-semibold">
+                            <Camera size={11} /> Horímetro: {log.fotoHorimetroInicial ? 'inicial ✓' : ''}{' '}
+                            {log.fotoHorimetroInicial && log.fotoHorimetroFinal ? '•' : ''}{' '}
+                            {log.fotoHorimetroFinal ? 'final ✓' : ''}
+                          </div>
+                        )}
                         {log.photos && log.photos.length > 0 && (
                           <div className="flex items-center mt-1 text-xs text-blue-600 font-semibold">
                             <ImageIcon size={12} className="mr-1" /> {log.photos.length} Foto(s) anexada(s)

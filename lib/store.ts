@@ -132,6 +132,29 @@ export const useFleetStore = create<FleetState>()(
                 }
                 dados.photos = paths;
               }
+              const uploadSingle = async (photo?: string) => {
+                if (!photo) return undefined;
+                if (/^https?:\/\//i.test(photo) || /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(photo)) return photo;
+                try {
+                  const mime = (photo.match(/^data:image\/([a-z]+)/i)?.[1] || 'jpeg').replace('jpeg', 'jpg');
+                  const b64 = photo.includes(',') ? photo.split(',')[1] : photo;
+                  const bin = atob(b64);
+                  const bytes = new Uint8Array(bin.length);
+                  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                  const filePath = `registros/${dados.id || genId()}/${genId()}.${mime === 'jpg' ? 'jpg' : mime}`;
+                  const { data, error } = await supabase.storage
+                    .from('fotos-registros')
+                    .upload(filePath, new Blob([bytes], { type: `image/${mime}` }), { upsert: true });
+                  return !error && data?.path ? data.path : undefined;
+                } catch (e) {
+                  console.warn('[store] erro ao subir foto dedicada:', e);
+                  return undefined;
+                }
+              };
+              const fotoIni = await uploadSingle((dados as any).fotoHorimetroInicial);
+              const fotoFim = await uploadSingle((dados as any).fotoHorimetroFinal);
+              if (fotoIni) (dados as any).fotoHorimetroInicial = fotoIni;
+              if (fotoFim) (dados as any).fotoHorimetroFinal = fotoFim;
               const { error } = await supabase.from('registros_diarios').insert([mapLogToDB(dados)]);
               if (error) {
                 // Handle FK violation

@@ -29,6 +29,7 @@ import { useShiftStore } from '@/store/shiftStore';
 import { QrScannerModal, QrScannerMockItem } from './QrScannerModal';
 import { StartShiftModal } from './StartShiftModal';
 import { EndShiftModal } from './EndShiftModal';
+import { PhotoCaptureModal } from './PhotoCaptureModal';
 import { useShiftFeedback } from './ShiftFeedbackProvider';
 import { playError, unlockAudio } from '@/lib/audioFeedback';
 import { useClockGuard } from './ClockGuard';
@@ -95,6 +96,11 @@ export function OfflineFormPanel({
   const [compressingText, setCompressingText] = useState('');
   const [savedSuccess, setSavedSuccess] = useState(false);
 
+  // Dedicated horimeter photos — initial is REQUIRED to open, final REQUIRED to close.
+  const [fotoHorimetroInicial, setFotoHorimetroInicial] = useState<string | null>(null);
+  const [fotoHorimetroFinal, setFotoHorimetroFinal] = useState<string | null>(null);
+  const [photoModalFor, setPhotoModalFor] = useState<'inicial' | 'final' | 'operacao' | null>(null);
+
   // Ref-based performant inputs
   const horimetroInicialRef = useRef<HTMLInputElement>(null);
   const horimetroFinalRef = useRef<HTMLInputElement>(null);
@@ -147,7 +153,9 @@ export function OfflineFormPanel({
         vazamentos: null,
       });
       setPhotos([]);
-      if (horimetroInicialRef.current) horimetroInicialRef.current.value = '';
+      setFotoHorimetroInicial(null);
+      setFotoHorimetroFinal(null);
+    if (horimetroInicialRef.current) horimetroInicialRef.current.value = '';
       if (horimetroFinalRef.current) horimetroFinalRef.current.value = '';
       if (fuelAddedRef.current) fuelAddedRef.current.value = '';
       if (commentsRef.current) commentsRef.current.value = '';
@@ -208,35 +216,21 @@ export function OfflineFormPanel({
     }
   };
 
-  // Generic fast image uploader with integrated compression logic
-  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setCompressingText('Compressão em andamento...');
-    const resolvedUrls: string[] = [...photos];
-
-    try {
-      for (let i = 0; i < files.length; i++) {
-        if (resolvedUrls.length >= 4) {
-          alert("Limite máximo de 4 imagens comprimidas atingido.");
-          break;
-        }
-        const base64Data = await compressImage(files[i], 800, 800, 0.6);
-        resolvedUrls.push(base64Data);
-      }
-
-      setPhotos(resolvedUrls);
-    } catch (err) {
-      console.error('Image compression failure:', err);
-      alert('Não foi possível comprimir esta foto. Tente outra.');
-    } finally {
-      setCompressingText('');
-    }
-  };
-
   const removePhoto = (idx: number) => {
     setPhotos(photos.filter((_, i) => i !== idx));
+  };
+
+  // Photo capture flow: a single component (PhotoCaptureModal) drives all
+  // photo inputs. It opens the device camera and returns a compressed JPEG.
+  const handlePhotoCaptured = (dataUrl: string) => {
+    if (photoModalFor === 'inicial') {
+      setFotoHorimetroInicial(dataUrl);
+    } else if (photoModalFor === 'final') {
+      setFotoHorimetroFinal(dataUrl);
+    } else {
+      setPhotos((prev) => [...prev, dataUrl].slice(0, 4));
+    }
+    setPhotoModalFor(null);
   };
 
   // Unified form submit: routes between three modes based on active shift + filled fields.
@@ -324,6 +318,18 @@ export function OfflineFormPanel({
 
         const horaFim = trustedNowIsoImport();
 
+        // Foto do horímetro final é OBRIGATÓRIA para fechar o turno.
+        if (!fotoHorimetroFinal) {
+          playError();
+          feedback.showWithSound({
+            kind: 'error',
+            title: 'Foto do horímetro final obrigatória',
+            subtitle: 'Registre a foto do painel/horímetro da máquina para encerrar o turno.',
+            errorMessage: 'Toque em "📷 Foto" ao lado do Horímetro Final antes de encerrar.',
+          });
+          return;
+        }
+
         // Update the existing rascunho with the close data
         await localDb.registrosDiarios.update(activeShift!.id, {
           horimetroFinal,
@@ -334,6 +340,7 @@ export function OfflineFormPanel({
           fechadoEm: horaFim,
           synced: 0,
           photos: [...photos],
+          fotoHorimetroFinal,
           clock_skew_ms: typeof driftMs === 'number' ? driftMs : null,
           clock_skew_suspect: clockSeverity !== 'ok' ? 1 as const : 0 as const,
         });
@@ -440,6 +447,18 @@ export function OfflineFormPanel({
           return;
         }
 
+        // Foto do horímetro inicial e final são OBRIGATÓRIAS no registro completo.
+        if (!fotoHorimetroInicial || !fotoHorimetroFinal) {
+          playError();
+          feedback.showWithSound({
+            kind: 'error',
+            title: 'Fotos do horímetro obrigatórias',
+            subtitle: 'Registre a foto do horímetro inicial e do final para salvar o registro completo.',
+            errorMessage: 'Toque em "📷 Foto" ao lado do Horímetro Inicial e do Horímetro Final.',
+          });
+          return;
+        }
+
         const hasCritical = Object.values(checklistAnswers).some((val) => val === 'critico');
         const hasRepair = Object.values(checklistAnswers).some((val) => val === 'reparar');
         const status: 'aprovado' | 'atencao' | 'critico' = hasCritical
@@ -484,6 +503,8 @@ export function OfflineFormPanel({
           observations,
           synced: 0,
           photos: [...photos],
+          fotoHorimetroInicial,
+          fotoHorimetroFinal,
           horaInicio: nowIso,
           horaFim: nowIso,
           fechadoEm: nowIso,
@@ -562,6 +583,18 @@ export function OfflineFormPanel({
         return;
       }
 
+      // Foto do horímetro inicial é OBRIGATÓRIA para abrir o turno.
+      if (!fotoHorimetroInicial) {
+        playError();
+        feedback.showWithSound({
+          kind: 'error',
+          title: 'Foto do horímetro inicial obrigatória',
+          subtitle: 'Registre a foto do painel/horímetro da máquina para abrir o turno.',
+          errorMessage: 'Toque em "📷 Foto" ao lado do Horímetro Inicial antes de abrir.',
+        });
+        return;
+      }
+
       const recordId = genId();
       const rascunho = {
         id: recordId,
@@ -579,6 +612,7 @@ export function OfflineFormPanel({
         status: 'rascunho' as const,
         synced: 0,
         photos: [...photos],
+        fotoHorimetroInicial,
         horaInicio: nowIso,
         clock_skew_ms: typeof driftMs === 'number' ? driftMs : null,
         clock_skew_suspect: clockSeverity !== 'ok' ? 1 as const : 0 as const,
@@ -693,6 +727,8 @@ export function OfflineFormPanel({
       vazamentos: null,
     });
     setPhotos([]);
+    setFotoHorimetroInicial(null);
+    setFotoHorimetroFinal(null);
     if (horimetroInicialRef.current) horimetroInicialRef.current.value = '';
     if (horimetroFinalRef.current) horimetroFinalRef.current.value = '';
     if (fuelAddedRef.current) fuelAddedRef.current.value = '';
@@ -1190,6 +1226,35 @@ export function OfflineFormPanel({
                   className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
                 />
               </div>
+              {fotoHorimetroInicial ? (
+                <div className="flex items-center gap-2 mt-1.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={fotoHorimetroInicial}
+                    alt="Foto horímetro inicial"
+                    className="w-12 h-12 md:w-10 md:h-10 rounded-lg object-cover border border-emerald-500/50"
+                  />
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <CheckCircle size={12} /> Foto registrada
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFotoHorimetroInicial(null)}
+                    className="text-[10px] text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                  >
+                    remover
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPhotoModalFor('inicial')}
+                  className="mt-1.5 w-full inline-flex items-center justify-center gap-1.5 text-[11px] md:text-[10px] font-bold text-red-700 dark:text-red-400 border-2 border-dashed border-red-400 dark:border-red-500/50 rounded-lg py-2 md:py-1.5 hover:bg-red-500/10 transition-colors cursor-pointer"
+                >
+                  <Camera size={13} />
+                  📷 Foto do Horímetro Inicial (obrigatória) {fotoHorimetroInicial ? '' : ''}
+                </button>
+              )}
               {previousHorimetro !== null && (
                 <span className="text-[11px] md:text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-1 flex items-center gap-1">
                   <History size={12} className="flex-shrink-0" />
@@ -1217,6 +1282,35 @@ export function OfflineFormPanel({
                   className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
                 />
               </div>
+              {fotoHorimetroFinal ? (
+                <div className="flex items-center gap-2 mt-1.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={fotoHorimetroFinal}
+                    alt="Foto horímetro final"
+                    className="w-12 h-12 md:w-10 md:h-10 rounded-lg object-cover border border-emerald-500/50"
+                  />
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <CheckCircle size={12} /> Foto registrada
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFotoHorimetroFinal(null)}
+                    className="text-[10px] text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                  >
+                    remover
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPhotoModalFor('final')}
+                  className="mt-1.5 w-full inline-flex items-center justify-center gap-1.5 text-[11px] md:text-[10px] font-bold text-red-700 dark:text-red-400 border-2 border-dashed border-red-400 dark:border-red-500/50 rounded-lg py-2 md:py-1.5 hover:bg-red-500/10 transition-colors cursor-pointer"
+                >
+                  <Camera size={13} />
+                  📷 Foto do Horímetro Final
+                </button>
+              )}
             </div>
 
             <div className="flex flex-col space-y-2">
@@ -1324,17 +1418,18 @@ export function OfflineFormPanel({
             </span>
 
             <div className="flex flex-wrap gap-3 items-center">
-              <label className="w-28 h-28 md:w-24 md:h-24 bg-gray-50 hover:bg-gray-100 dark:bg-[#101010] dark:hover:bg-neutral-900 border-2 border-dashed border-gray-400 dark:border-white/20 rounded-xl flex flex-col items-center justify-center cursor-pointer text-gray-700 dark:text-gray-300 transition-colors group">
-                <Camera size={24} className="md:!size-5 group-hover:text-[#eab308] transition-colors" />
-                <span className="text-xs md:text-[9px] text-gray-600 dark:text-gray-300 mt-1.5 md:mt-1 font-bold text-center leading-tight">Anexar<br/>Fotos</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handlePhotoCapture}
-                  className="hidden"
-                />
-              </label>
+              {photos.length < 4 && (
+                <button
+                  type="button"
+                  onClick={() => setPhotoModalFor('operacao')}
+                  disabled={!!compressingText}
+                  className="w-28 h-28 md:w-24 md:h-24 bg-gray-50 hover:bg-gray-100 dark:bg-[#101010] dark:hover:bg-neutral-900 border-2 border-dashed border-gray-400 dark:border-white/20 rounded-xl flex flex-col items-center justify-center cursor-pointer text-gray-700 dark:text-gray-300 transition-colors group"
+                  title="Abrir a câmera do aparelho para fotografar a operação"
+                >
+                  <Camera size={24} className="md:!size-5 group-hover:text-[#eab308] transition-colors" />
+                  <span className="text-xs md:text-[9px] text-gray-600 dark:text-gray-300 mt-1.5 md:mt-1 font-bold text-center leading-tight">Anexar<br/>Fotos</span>
+                </button>
+              )}
 
               {photos.map((dataUri, idx) => (
                 <div key={idx} className="relative w-28 h-28 md:w-24 md:h-24 rounded-xl overflow-hidden border-2 border-gray-300 dark:border-white/10 group bg-black">
@@ -1702,6 +1797,27 @@ export function OfflineFormPanel({
             : 'A jornada continua aberta.'
         }
         confirmLabel="Salvar e Adicionar Outra"
+      />
+
+      {/* Photo capture modal — opens the device camera for horimeter/operation photos */}
+      <PhotoCaptureModal
+        open={photoModalFor !== null}
+        title={
+          photoModalFor === 'inicial'
+            ? 'Foto do Horímetro Inicial'
+            : photoModalFor === 'final'
+            ? 'Foto do Horímetro Final'
+            : 'Foto da Operação'
+        }
+        description={
+          photoModalFor === 'inicial'
+            ? 'Aponte a câmera para o painel/horímetro da máquina e capture a leitura inicial.'
+            : photoModalFor === 'final'
+            ? 'Aponte a câmera para o painel/horímetro da máquina e capture a leitura final.'
+            : 'Aponte a câmera para o equipamento/operação. Máx 4 fotos.'
+        }
+        onClose={() => setPhotoModalFor(null)}
+        onCapture={handlePhotoCaptured}
       />
 
       {/* Shift creation error banner */}
