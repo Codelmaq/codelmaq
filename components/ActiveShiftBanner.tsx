@@ -70,8 +70,8 @@ export function ActiveShiftBanner() {
             data-testid="active-shift-banner"
             className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30"
           >
-            <div className="max-w-7xl mx-auto px-3 py-1.5 md:px-4 md:py-2 flex items-center justify-between gap-2 flex-wrap">
-              {/* Status + timer + machine + meta — uma única linha */}
+            <div className="max-w-7xl mx-auto px-3 py-1.5 md:px-4 md:py-2 flex flex-col md:flex-row md:items-center justify-between gap-1.5 md:gap-2">
+              {/* Status + timer + machine + meta — linha superior (mobile) / única linha (desktop) */}
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <motion.span
                   animate={{ opacity: [1, 0.35, 1] }}
@@ -98,8 +98,8 @@ export function ActiveShiftBanner() {
                 </span>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-1.5 flex-shrink-0">
+              {/* Actions — linha inferior no mobile, ao lado no desktop */}
+              <div className="flex items-center gap-1.5 w-full md:w-auto flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -109,7 +109,7 @@ export function ActiveShiftBanner() {
                       endTurno();
                     }
                   }}
-                  className="px-3 py-1.5 md:px-4 md:py-2 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-lg text-[11px] md:text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                  className="flex-1 md:flex-none justify-center px-3 py-1.5 md:px-4 md:py-2 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-lg text-[11px] md:text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow cursor-pointer"
                 >
                   <Square size={12} fill="currentColor" />
                   Encerrar Turno
