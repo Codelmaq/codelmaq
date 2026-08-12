@@ -68,7 +68,7 @@ export function ActiveShiftBanner() {
             exit={{ y: -120, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 240, damping: 24 }}
             data-testid="active-shift-banner"
-            className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30"
+            className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30 -mx-4 md:-mx-8"
           >
             <div className="max-w-4xl mx-auto px-3 py-1.5 md:px-4 md:py-2 flex flex-col gap-1.5 md:gap-2">
               {/* Status + timer + machine + meta — linha superior */}

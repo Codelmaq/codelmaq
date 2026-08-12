@@ -1609,9 +1609,8 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
         )}
       </AnimatePresence>
 
-      <ActiveShiftBanner />
-
       <main className={`flex-1 p-4 md:p-8 overflow-y-auto ${!isSupabaseConfigured ? 'md:mt-12' : ''}`}>
+        <ActiveShiftBanner />
         <div className="max-w-7xl mx-auto">
           {currentView === 'dashboard' && isManager && (
             <DashboardView machines={machines} maintenances={maintenances} logs={dailyLogs} alerts={maintenanceAlerts} />
