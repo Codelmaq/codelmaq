@@ -68,11 +68,11 @@ export function ActiveShiftBanner() {
             exit={{ y: -120, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 240, damping: 24 }}
             data-testid="active-shift-banner"
-            className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30"
+            className="sticky top-0 z-30 md:flex md:justify-center md:px-3 md:pt-2"
           >
-            <div className="max-w-7xl mx-auto px-3 py-1.5 md:px-4 md:py-2 flex flex-col md:flex-row md:items-center justify-between gap-1.5 md:gap-2">
-              {/* Status + timer + machine + meta — linha superior (mobile) / única linha (desktop) */}
-              <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-full md:w-auto bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30 md:rounded-full px-3 py-1.5 md:px-4 md:py-2 flex flex-col md:flex-row md:items-center justify-between gap-1.5 md:gap-3">
+              {/* Status + timer + machine + meta — linha superior (mobile) / compacto (desktop) */}
+              <div className="flex items-center gap-2 min-w-0 flex-1 md:flex-none">
                 <motion.span
                   animate={{ opacity: [1, 0.35, 1] }}
                   transition={{ duration: 1, repeat: Infinity }}
