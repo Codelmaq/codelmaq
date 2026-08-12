@@ -12,9 +12,13 @@ interface EndShiftModalProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (data: { horimetroFinal: number; fuelAdded: number; observations: string }) => Promise<void> | void;
+  /** Título opcional — usado no fluxo de troca de máquina dentro da jornada. */
+  title?: string;
+  subtitle?: string;
+  confirmLabel?: string;
 }
 
-export function EndShiftModal({ open, onClose, onConfirm }: EndShiftModalProps) {
+export function EndShiftModal({ open, onClose, onConfirm, title, subtitle, confirmLabel }: EndShiftModalProps) {
   const activeShift = useShiftStore((s) => s.activeShift);
   const [horimetroFinal, setHorimetroFinal] = useState('');
   const [fuelAdded, setFuelAdded] = useState('0');
@@ -73,11 +77,10 @@ export function EndShiftModal({ open, onClose, onConfirm }: EndShiftModalProps) 
             <div>
               <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 font-heading uppercase flex items-center gap-2">
                 <Square className="text-emerald-600" size={16} />
-                Encerrar Turno
+                {title || 'Encerrar Turno'}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {activeShift.machineId}
-                {activeShift.machineName ? ` — ${activeShift.machineName}` : ''}
+                {subtitle || `${activeShift.machineId}${activeShift.machineName ? ` — ${activeShift.machineName}` : ''}`}
               </p>
             </div>
             <button
@@ -181,7 +184,7 @@ export function EndShiftModal({ open, onClose, onConfirm }: EndShiftModalProps) 
               className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50 cursor-pointer"
             >
               <Square size={12} />
-              {submitting ? 'Salvando...' : 'Encerrar e Salvar'}
+              {submitting ? 'Salvando...' : confirmLabel || 'Encerrar e Salvar'}
             </button>
           </div>
         </motion.div>

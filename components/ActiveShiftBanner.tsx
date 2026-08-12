@@ -20,8 +20,9 @@ function formatElapsed(ms: number) {
 }
 
 export function ActiveShiftBanner() {
+  const turno = useShiftStore((s) => s.turno);
   const activeShift = useShiftStore((s) => s.activeShift);
-  const endShift = useShiftStore((s) => s.endShift);
+  const endTurno = useShiftStore((s) => s.endTurno);
   const feedback = useShiftFeedback();
   const [elapsed, setElapsed] = useState('00:00:00');
   const [endModalOpen, setEndModalOpen] = useState(false);
@@ -29,28 +30,28 @@ export function ActiveShiftBanner() {
   const [minimized, setMinimized] = useState(false);
 
   useEffect(() => {
-    if (!activeShift) {
+    if (!turno) {
       setElapsed('00:00:00');
       setDismissed(false);
       setMinimized(false);
       return;
     }
     const tick = () => {
-      const startedAt = new Date(activeShift.startedAt).getTime();
+      const startedAt = new Date(turno.startedAt).getTime();
       setElapsed(formatElapsed(Date.now() - startedAt));
     };
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [activeShift]);
+  }, [turno]);
 
-  if (!activeShift || dismissed) return null;
+  if (!turno || dismissed) return null;
 
-  const horaInicioBR = new Date(activeShift.startedAt).toLocaleTimeString('pt-BR', {
+  const horaInicioBR = new Date(turno.startedAt).toLocaleTimeString('pt-BR', {
     hour: '2-digit',
     minute: '2-digit',
   });
-  const dataInicioBR = new Date(activeShift.startedAt).toLocaleDateString('pt-BR', {
+  const dataInicioBR = new Date(turno.startedAt).toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -110,9 +111,9 @@ className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-70
                     <span className="hidden sm:inline text-xs opacity-70">•</span>
                     <span className="text-sm md:text-base font-bold flex items-center gap-1.5 truncate">
                       <Truck size={15} className="md:size-4.5 flex-shrink-0" />
-                      <span className="truncate">{activeShift.machineId}</span>
+                      <span className="truncate">{activeShift?.machineId || '— nenhuma máquina ativa —'}</span>
                     </span>
-                    {activeShift.machineName && (
+                    {activeShift?.machineName && (
                       <span className="hidden md:inline text-sm opacity-90 truncate">
                         — {activeShift.machineName}
                       </span>
@@ -123,11 +124,15 @@ className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-70
                     <span>
                       Abertura: <span className="font-mono font-black">{dataInicioBR} às {horaInicioBR}</span>
                     </span>
-                    <span>•</span>
-                    <span>
-                      Horímetro inicial:{' '}
-                      <span className="font-mono font-black">{activeShift.horimetroInicial}</span>
-                    </span>
+                    {activeShift && (
+                      <>
+                        <span>•</span>
+                        <span>
+                          Horímetro inicial:{' '}
+                          <span className="font-mono font-black">{activeShift.horimetroInicial}</span>
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -135,7 +140,13 @@ className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-70
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setEndModalOpen(true)}
+                  onClick={() => {
+                    if (activeShift) {
+                      setEndModalOpen(true);
+                    } else {
+                      endTurno();
+                    }
+                  }}
                   className="px-3.5 py-2 md:px-5 md:py-2.5 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-lg text-xs md:text-sm uppercase tracking-wider flex items-center gap-2 transition-all shadow-xl cursor-pointer"
                 >
                   <Square size={13} fill="currentColor" />
@@ -173,7 +184,7 @@ className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-70
           />
           <span className="font-mono">{elapsed}</span>
           <Square size={11} fill="currentColor" />
-          <span className="hidden sm:inline truncate max-w-[120px]">{activeShift.machineId}</span>
+          <span className="hidden sm:inline truncate max-w-[120px]">{activeShift?.machineId || ''}</span>
           <Maximize2 size={11} />
         </motion.button>
       )}
@@ -182,6 +193,7 @@ className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-70
         open={endModalOpen}
         onClose={() => setEndModalOpen(false)}
         onConfirm={async (data) => {
+          if (!activeShift) return;
           const horaInicioMs = new Date(activeShift.startedAt).getTime();
           try {
             // Validation — fail loudly if horimetro final is invalid.
@@ -244,7 +256,7 @@ className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-70
               errorMessage: e?.message || String(e),
             });
           } finally {
-            endShift();
+            endTurno();
             setEndModalOpen(false);
           }
         }}

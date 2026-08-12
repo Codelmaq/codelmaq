@@ -19,6 +19,7 @@ import {
   Square,
   Clock,
   History,
+  Plus,
 } from 'lucide-react';
 import { localDb } from '@/lib/localDb';
 import { syncEngine, SyncStatusReport } from '@/lib/syncEngine';
@@ -27,6 +28,7 @@ import { genId, parseDecimal } from '@/lib/utils';
 import { useShiftStore } from '@/store/shiftStore';
 import { QrScannerModal, QrScannerMockItem } from './QrScannerModal';
 import { StartShiftModal } from './StartShiftModal';
+import { EndShiftModal } from './EndShiftModal';
 import { useShiftFeedback } from './ShiftFeedbackProvider';
 import { playError, unlockAudio } from '@/lib/audioFeedback';
 import { useClockGuard } from './ClockGuard';
@@ -70,8 +72,11 @@ export function OfflineFormPanel({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [shiftCreationError, setShiftCreationError] = useState<string | null>(null);
-  const startShift = useShiftStore((s) => s.startShift);
-  const endShiftStore = useShiftStore((s) => s.endShift);
+  const openTurno = useShiftStore((s) => s.openTurno);
+  const addMachine = useShiftStore((s) => s.addMachine);
+  const closeMachine = useShiftStore((s) => s.closeMachine);
+  const endTurno = useShiftStore((s) => s.endTurno);
+  const turno = useShiftStore((s) => s.turno);
   const activeShift = useShiftStore((s) => s.activeShift);
   const feedback = useShiftFeedback();
 
@@ -122,12 +127,12 @@ export function OfflineFormPanel({
     return unsubscribe;
   }, []);
 
-  // Rastreia se havia turno ativo na renderização anterior (para detectar encerramento).
+  // Rastreia se havia máquina ativa na renderização anterior (para detectar encerramento).
   const lastActiveShiftRef = useRef(false);
 
-  // Quando um turno é encerrado (aqui ou no banner global) e volta a abertura
-  // disponível, preparamos o formulário para uma máquina adicional: limpa a
-  // máquina atual e a vistoria, mantendo o operador pronto para iniciar outra.
+  // Quando uma máquina é encerrada (aqui, no banner ou via "Adicionar máquina")
+  // e o formulário volta a permitir seleção, limpamos máquina/vistoria/fotos
+  // e os horímetros — deixando os campos livres para a próxima máquina.
   useEffect(() => {
     if (!activeShift && lastActiveShiftRef.current) {
       setMachineId('');
@@ -143,6 +148,9 @@ export function OfflineFormPanel({
       });
       setPhotos([]);
       if (horimetroInicialRef.current) horimetroInicialRef.current.value = '';
+      if (horimetroFinalRef.current) horimetroFinalRef.current.value = '';
+      if (fuelAddedRef.current) fuelAddedRef.current.value = '';
+      if (commentsRef.current) commentsRef.current.value = '';
     }
     lastActiveShiftRef.current = !!activeShift;
   }, [activeShift]);
@@ -232,7 +240,7 @@ export function OfflineFormPanel({
   };
 
   // Unified form submit: routes between three modes based on active shift + filled fields.
-  //   * OPEN  — no active shift, horimetroFinal empty          → create rascunho + startShift()
+  //   * OPEN  — no active shift, horimetroFinal empty          → rascunho + openTurno()/addMachine()
   //   * FULL  — no active shift, horimetroFinal filled         → create closed record + checklist
   //   * CLOSE — active shift exists, horimetroFinal required    → update rascunho → fechado
   const handleSubmit = async (e: React.FormEvent) => {
@@ -276,20 +284,20 @@ export function OfflineFormPanel({
     const fuelAdded = parseDecimal(fuelAddedRef.current?.value || 0);
     const observations = commentsRef.current?.value || '';
 
-    // Refuse to start a different shift while another is open.
-    if (activeShift && activeShift.operatorId === operatorId && activeShift.machineId !== machineId) {
+    // Refuse to start/open a machine while a machine is already being worked.
+    if (activeShift && turno?.operatorId === operatorId && activeShift.machineId !== machineId) {
       playError();
       feedback.showWithSound({
         kind: 'error',
-        title: 'Já existe um turno em andamento',
-        subtitle: `Encerre o turno da máquina ${activeShift.machineId} antes de iniciar outro.`,
-        errorMessage: 'Toque em "Encerrar Turno" no banner verde para fechar o turno atual.',
+        title: 'Já existe uma máquina em uso',
+        subtitle: `Encerre a máquina ${activeShift.machineId} antes de iniciar outra.`,
+        errorMessage: 'Toque em "Adicionar máquina" abaixo dos horímetros para trocar de equipamento.',
       });
       return;
     }
 
-    const isClosing = !!activeShift && activeShift.operatorId === operatorId;
-    const wantsFullRecord = !isClosing && horimetroFinalStr !== '' && Number.isFinite(horimetroFinal);
+    const isClosing = !!activeShift && turno?.operatorId === operatorId;
+    const wantsFullRecord = !isClosing && !turno && horimetroFinalStr !== '' && Number.isFinite(horimetroFinal);
 
     // ⚠️ Usa a data/hora "confiável" (do servidor, com cache local). Se nunca
     // conseguimos medir online, cai no fallback do device. De qualquer jeito, o
@@ -390,7 +398,7 @@ export function OfflineFormPanel({
           ],
         });
 
-        endShiftStore();
+        endTurno();
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 5000);
         resetManualForm();
@@ -517,7 +525,7 @@ export function OfflineFormPanel({
 
       // ---------------------------------------------------------------
       // MODE 3 — OPEN  (no active shift, no final filled)
-      // Create rascunho + startShift().
+      // Create rascunho + openTurno()/addMachine().
       // ---------------------------------------------------------------
       if (!machineId) {
         playError();
@@ -608,22 +616,38 @@ export function OfflineFormPanel({
       await syncEngine.countPendingRecords();
 
       const machine = (machines || []).find((m) => m.id === machineId);
-      startShift({
+      const machineSegment = {
         id: recordId,
         machineId,
         machineName: machine?.name || '',
-        operatorId,
-        operatorName: currentUserProfile.nome,
         startedAt: nowIso,
         horimetroInicial,
-        siteId: rascunho.siteId,
-        data: today,
-      });
+      };
+
+      // Primeira máquina do dia → abre a jornada. Máquina seguinte,
+      // ainda dentro do expediente → só adiciona o segmento novo.
+      if (turno) {
+        addMachine(machineSegment);
+      } else {
+        openTurno(
+          {
+            id: genId(),
+            operatorId,
+            operatorName: currentUserProfile.nome,
+            siteId: rascunho.siteId,
+            data: today,
+            startedAt: nowIso,
+          },
+          machineSegment
+        );
+      }
 
       feedback.showWithSound({
         kind: 'open',
-        title: 'Turno Aberto!',
-        subtitle: 'Operação registrada. Encerre ao final do dia.',
+        title: turno ? 'Nova Máquina Aberta!' : 'Turno Aberto!',
+        subtitle: turno
+          ? 'Máquina registrada na jornada de hoje. Troque/adicione quando precisar.'
+          : 'Operação registrada. Encerre ao final do dia.',
         details: [
           { label: 'Máquina', value: machineId },
           { label: 'Horímetro inicial', value: String(horimetroInicial), emphasis: 'highlight' },
@@ -703,9 +727,9 @@ export function OfflineFormPanel({
       playError();
       feedback.showWithSound({
         kind: 'error',
-        title: 'Já existe um turno em andamento',
-        subtitle: `Encerre o turno da máquina ${activeShift.machineId} antes de iniciar outro.`,
-        errorMessage: 'Use o banner verde no topo da tela ou toque em "Encerrar Turno".',
+        title: 'Máquina já em uso',
+        subtitle: `Encerre a máquina ${activeShift.machineId} antes de iniciar outra.`,
+        errorMessage: 'Toque em "Adicionar máquina" abaixo dos horímetros para trocar de equipamento.',
       });
       return;
     }
@@ -793,17 +817,29 @@ export function OfflineFormPanel({
       await localDb.registrosDiarios.add(newDailyLog);
       await syncEngine.countPendingRecords();
 
-      startShift({
+      const machineSegment = {
         id: newDailyLog.id,
         machineId: newDailyLog.machineId,
         machineName: newDailyLog.machineName,
-        operatorId: newDailyLog.operatorId,
-        operatorName: newDailyLog.operatorName,
         startedAt: nowIso,
         horimetroInicial: newDailyLog.horimetroInicial,
-        siteId: newDailyLog.siteId,
-        data: todayStr,
-      });
+      };
+
+      if (turno) {
+        addMachine(machineSegment);
+      } else {
+        openTurno(
+          {
+            id: genId(),
+            operatorId: currentUserProfile.id,
+            operatorName: currentUserProfile.nome,
+            siteId: newDailyLog.siteId,
+            data: todayStr,
+            startedAt: nowIso,
+          },
+          machineSegment
+        );
+      }
 
       // Pre-select the machine in the form
       setMachineId(data.machineId);
@@ -817,8 +853,10 @@ export function OfflineFormPanel({
       // Big visual + audio confirmation
       feedback.showWithSound({
         kind: 'open',
-        title: 'Turno Aberto!',
-        subtitle: 'Operação registrada no aparelho. Encerre ao final do dia.',
+        title: turno ? 'Nova Máquina Aberta!' : 'Turno Aberto!',
+        subtitle: turno
+          ? 'Máquina registrada na jornada de hoje. Troque/adicione quando precisar.'
+          : 'Operação registrada no aparelho. Encerre ao final do dia.',
         details: [
           { label: 'Máquina', value: data.machineId },
           {
@@ -854,6 +892,104 @@ export function OfflineFormPanel({
     },
     [machines],
   );
+
+  // ---------------------------------------------------------------------
+  // "Adicionar máquina" — troca de equipamento dentro da jornada.
+  // Exige o horímetro final da máquina atual (se ainda não anotado) e então
+  // encerra o segmento atual (jornada continua aberta) liberando os campos
+  // para a próxima máquina.
+  // ---------------------------------------------------------------------
+  const [switchModalOpen, setSwitchModalOpen] = useState(false);
+
+  const handleAddMachine = () => {
+    if (!turno) {
+      playError();
+      feedback.showWithSound({
+        kind: 'error',
+        title: 'Nenhum turno aberto',
+        subtitle: 'Abra o turno da primeira máquina do dia antes de adicionar outra.',
+        errorMessage: 'Toque em "Abrir Turno" com a máquina e o horímetro inicial preenchidos.',
+      });
+      return;
+    }
+    if (activeShift) {
+      // Há máquina em uso → o sistema exige anotar o final atual antes de liberar.
+      setSwitchModalOpen(true);
+    } else {
+      // Jornada aberta sem máquina em uso — os campos já estão livres.
+      feedback.showWithSound({
+        kind: 'success',
+        title: 'Selecione a nova máquina',
+        subtitle: 'Os campos estão livres. Escolha a máquina no menu superior e preencha o horímetro inicial.',
+      });
+    }
+  };
+
+  const confirmSwitchMachine = async (data: { horimetroFinal: number; fuelAdded: number; observations: string }) => {
+    if (!activeShift) return;
+    const horaInicioMs = new Date(activeShift.startedAt).getTime();
+    try {
+      if (!Number.isFinite(data.horimetroFinal) || data.horimetroFinal < activeShift.horimetroInicial) {
+        playError();
+        feedback.showWithSound({
+          kind: 'error',
+          title: 'Horímetro final inválido',
+          subtitle: `O valor precisa ser maior ou igual a ${activeShift.horimetroInicial}.`,
+          errorMessage: `Valor recebido: ${data.horimetroFinal}. Verifique o painel da máquina.`,
+        });
+        return;
+      }
+
+      const horaFim = new Date().toISOString();
+      await localDb.registrosDiarios.update(activeShift.id, {
+        horimetroFinal: data.horimetroFinal,
+        fuelAdded: data.fuelAdded,
+        observations: data.observations || '',
+        status: 'fechado',
+        horaFim: horaFim,
+        fechadoEm: horaFim,
+        synced: 0,
+      });
+      await syncEngine.countPendingRecords();
+      await syncEngine.runSync();
+
+      const delta = Number((data.horimetroFinal - activeShift.horimetroInicial).toFixed(1));
+      const duracaoHoras = (Date.now() - horaInicioMs) / 3_600_000;
+      const duracaoFmt = `${Math.floor(duracaoHoras)}h ${String(Math.round((duracaoHoras % 1) * 60)).padStart(2, '0')}min`;
+
+      feedback.showWithSound({
+        kind: 'close',
+        title: 'Máquina Encerrada!',
+        subtitle: 'Segmento salvo. A jornada continua aberta — escolha a próxima máquina.',
+        details: [
+          { label: 'Máquina', value: activeShift.machineId },
+          {
+            label: 'Horímetro',
+            value: `${activeShift.horimetroInicial} → ${data.horimetroFinal}`,
+            emphasis: 'highlight',
+          },
+          { label: 'Trabalhadas', value: `${delta}h • ${duracaoFmt}` },
+          ...(data.fuelAdded > 0 ? [{ label: 'Combustível', value: `${data.fuelAdded} L` }] : []),
+        ],
+      });
+
+      // Encerra o segmento da máquina atual — a jornada (turno) permanece.
+      closeMachine();
+      setSwitchModalOpen(false);
+      loadRecentLogs();
+    } catch (e: any) {
+      console.error('Erro ao encerrar máquina para troca:', e);
+      playError();
+      feedback.showWithSound({
+        kind: 'error',
+        title: 'Erro ao encerrar máquina',
+        subtitle: 'O registro não foi salvo.',
+        errorMessage: e?.message || String(e),
+      });
+    } finally {
+      setSwitchModalOpen(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -939,17 +1075,19 @@ export function OfflineFormPanel({
           {/* Mode banner — tells the operator what the next submit will do. */}
           {(() => {
             const horimetroFinalLive = (horimetroFinalRef.current?.value || '').trim();
-            const isClosing = !!activeShift && activeShift.operatorId === currentUserProfile?.id;
-            const wantsFull = !isClosing && horimetroFinalLive !== '';
+            const isClosing = !!activeShift && turno?.operatorId === currentUserProfile?.id;
+            const wantsFull = !isClosing && !turno && horimetroFinalLive !== '';
             const mode = isClosing ? 'close' : wantsFull ? 'full' : 'open';
             const MODE_CONFIG = {
               open: {
                 bg: 'bg-emerald-500/10 border-emerald-500/40',
                 text: 'text-emerald-700 dark:text-emerald-300',
                 icon: <Play size={16} fill="currentColor" />,
-                title: 'MODO ABERTURA',
+                title: turno ? 'MODO NOVA MÁQUINA' : 'MODO ABERTURA',
                 subtitle: isClosing
                   ? undefined
+                  : turno
+                  ? 'Escolha a nova máquina e preencha o horímetro inicial para adicioná-la à jornada de hoje.'
                   : 'Preencha máquina, obra, horímetro inicial e checklist. Deixe o horímetro final em branco para abrir o turno.',
               },
               full: {
@@ -1121,6 +1259,20 @@ export function OfflineFormPanel({
             </div>
           </div>
 
+          {/* Adicionar máquina — troca de equipamento dentro da jornada do dia. */}
+          {turno && (
+            <div className="flex justify-center md:justify-start">
+              <button
+                type="button"
+                onClick={handleAddMachine}
+                className="inline-flex items-center gap-1.5 text-xs md:text-[11px] font-bold text-gray-600 dark:text-gray-300 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 border border-gray-300 dark:border-white/10 hover:border-emerald-500/50 rounded-full px-3.5 py-1.5 transition-all cursor-pointer"
+              >
+                <Plus size={14} />
+                Adicionar máquina
+              </button>
+            </div>
+          )}
+
           {/* ITENS DE VISTORIA */}
           <div className="pt-4 border-t border-gray-200 dark:border-white/5 space-y-3">
             <span className="text-sm md:text-xs font-bold uppercase tracking-wider text-yellow-700 dark:text-yellow-400 flex items-center gap-1.5">
@@ -1219,12 +1371,12 @@ export function OfflineFormPanel({
           <div className="pt-2 flex justify-end">
             {(() => {
               const horimetroFinalLive = (horimetroFinalRef.current?.value || '').trim();
-              const isClosing = !!activeShift && activeShift.operatorId === currentUserProfile?.id;
-              const wantsFull = !isClosing && horimetroFinalLive !== '';
+              const isClosing = !!activeShift && turno?.operatorId === currentUserProfile?.id;
+              const wantsFull = !isClosing && !turno && horimetroFinalLive !== '';
               const mode = isClosing ? 'close' : wantsFull ? 'full' : 'open';
               const BTN_CONFIG = {
                 open: {
-                  label: 'Abrir Turno',
+                  label: turno ? 'Abrir Nova Máquina' : 'Abrir Turno',
                   icon: <Play size={18} className="md:!size-3.5" fill="currentColor" />,
                   classes: 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30',
                 },
@@ -1536,6 +1688,20 @@ export function OfflineFormPanel({
           setPreviousEndDate(null);
         }}
         onConfirm={handleStartShift}
+      />
+
+      {/* End Shift Modal (troca de máquina) — exige o final da máquina atual */}
+      <EndShiftModal
+        open={switchModalOpen}
+        onClose={() => setSwitchModalOpen(false)}
+        onConfirm={confirmSwitchMachine}
+        title="Encerrar Máquina Atual"
+        subtitle={
+          activeShift
+            ? `${activeShift.machineId}${activeShift.machineName ? ` — ${activeShift.machineName}` : ''} — a jornada continua aberta.`
+            : 'A jornada continua aberta.'
+        }
+        confirmLabel="Salvar e Adicionar Outra"
       />
 
       {/* Shift creation error banner */}
