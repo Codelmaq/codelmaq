@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, Square, Truck, Activity, Minimize2, Maximize2 } from 'lucide-react';
+import { Square, Truck, Minimize2, Maximize2 } from 'lucide-react';
 import { useShiftStore } from '@/store/shiftStore';
 import { localDb } from '@/lib/localDb';
 import { syncEngine } from '@/lib/syncEngine';
@@ -68,76 +68,38 @@ export function ActiveShiftBanner() {
             exit={{ y: -120, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 240, damping: 24 }}
             data-testid="active-shift-banner"
-className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30 relative overflow-hidden"
-            >
-              {/* Animated pulse border */}
-              <motion.div
-                animate={{ opacity: [0.25, 0.5, 0.25] }}
-                transition={{ duration: 1.8, repeat: Infinity }}
-                className="absolute inset-0 pointer-events-none ring-2 ring-yellow-300/30 rounded-none"
-              />
-
-            {/* Big banner content */}
-            <div className="max-w-7xl mx-auto px-3 md:px-4 py-2.5 md:py-3 flex items-center justify-between gap-3 flex-wrap relative">
-              <div className="flex items-center gap-2.5 md:gap-3 min-w-0 flex-1">
-                {/* Pulse icon */}
-                <motion.div
-                  animate={{ scale: [1, 1.06, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="relative flex items-center justify-center w-9 h-9 md:w-11 md:h-11 rounded-full bg-white/25 ring-2 ring-white/40 flex-shrink-0"
-                >
-                  <Activity className="w-4.5 h-4.5 md:w-5 md:h-5" />
-                  <motion.span
-                    animate={{ scale: [1, 1.6, 1], opacity: [0.7, 0, 0.7] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    className="absolute inset-0 rounded-full bg-white/30"
-                  />
-                </motion.div>
-
-                {/* Text block */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[10px] md:text-xs uppercase tracking-widest font-black opacity-95">
-                    <motion.span
-                      animate={{ opacity: [1, 0.35, 1] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                      className="w-2 h-2 rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50"
-                    />
-                    TURNO EM ABERTO — FECHAMENTO PENDENTE
-                  </div>
-                  <div className="flex items-baseline gap-2 md:gap-3 mt-0.5 flex-wrap">
-                    <span className="text-lg md:text-2xl font-black font-mono tabular-nums tracking-wider drop-shadow-lg">
-                      {elapsed}
-                    </span>
-                    <span className="hidden sm:inline text-xs opacity-70">•</span>
-                    <span className="text-sm md:text-base font-bold flex items-center gap-1.5 truncate">
-                      <Truck size={15} className="md:size-4.5 flex-shrink-0" />
-                      <span className="truncate">{activeShift?.machineId || '— nenhuma máquina ativa —'}</span>
-                    </span>
-                    {activeShift?.machineName && (
-                      <span className="hidden md:inline text-sm opacity-90 truncate">
-                        — {activeShift.machineName}
-                      </span>
-                    )}
-                  </div>
-                  <div className="hidden sm:flex items-center gap-2 mt-0.5 text-[11px] md:text-xs opacity-90 flex-wrap">
-                    <Clock size={12} />
-                    <span>
-                      Abertura: <span className="font-mono font-black">{dataInicioBR} às {horaInicioBR}</span>
-                    </span>
-                    {activeShift && (
-                      <>
-                        <span>•</span>
-                        <span>
-                          Horímetro inicial:{' '}
-                          <span className="font-mono font-black">{activeShift.horimetroInicial}</span>
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
+            className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30"
+          >
+            <div className="max-w-7xl mx-auto px-3 py-1.5 md:px-4 md:py-2 flex items-center justify-between gap-2 flex-wrap">
+              {/* Status + timer + machine + meta — uma única linha */}
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <motion.span
+                  animate={{ opacity: [1, 0.35, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                  className="w-2 h-2 rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50 flex-shrink-0"
+                />
+                <span className="text-[10px] md:text-xs uppercase tracking-widest font-black whitespace-nowrap">
+                  Turno em aberto
+                </span>
+                <span className="hidden sm:inline text-xs opacity-70">•</span>
+                <span className="text-sm md:text-lg font-black font-mono tabular-nums tracking-wider">
+                  {elapsed}
+                </span>
+                <span className="hidden sm:inline text-xs opacity-70">•</span>
+                <span className="text-xs md:text-sm font-bold flex items-center gap-1 min-w-0">
+                  <Truck size={13} className="md:size-3.5 flex-shrink-0" />
+                  <span className="truncate">{activeShift?.machineId || '— nenhuma máquina ativa —'}</span>
+                </span>
+                <span className="hidden lg:inline-flex items-center gap-2 text-[11px] opacity-80 whitespace-nowrap">
+                  <span>• Abr. {dataInicioBR} às {horaInicioBR}</span>
+                  {activeShift && (
+                    <span>• Hor. ini. {activeShift.horimetroInicial}</span>
+                  )}
+                </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Actions */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -147,19 +109,19 @@ className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-70
                       endTurno();
                     }
                   }}
-                  className="px-3.5 py-2 md:px-5 md:py-2.5 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-lg text-xs md:text-sm uppercase tracking-wider flex items-center gap-2 transition-all shadow-xl cursor-pointer"
+                  className="px-3 py-1.5 md:px-4 md:py-2 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-lg text-[11px] md:text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow cursor-pointer"
                 >
-                  <Square size={13} fill="currentColor" />
+                  <Square size={12} fill="currentColor" />
                   Encerrar Turno
                 </button>
                 <button
                   type="button"
                   onClick={() => setMinimized(true)}
-                  className="p-2 md:p-2.5 hover:bg-white/15 rounded-lg transition-colors cursor-pointer"
+                  className="p-1.5 hover:bg-white/15 rounded-lg transition-colors cursor-pointer"
                   aria-label="Minimizar banner"
                   title="Minimizar (não encerra o turno)"
                 >
-                  <Minimize2 size={16} />
+                  <Minimize2 size={15} />
                 </button>
               </div>
             </div>
