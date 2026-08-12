@@ -50,6 +50,11 @@ export function ActiveShiftBanner() {
     hour: '2-digit',
     minute: '2-digit',
   });
+  const dataInicioBR = new Date(activeShift.startedAt).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 
   return (
     <>
@@ -62,7 +67,7 @@ export function ActiveShiftBanner() {
             exit={{ y: -120, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 240, damping: 24 }}
             data-testid="active-shift-banner"
-            className="sticky top-0 z-30 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 text-white shadow-2xl shadow-emerald-500/40 ring-4 ring-yellow-300/40 relative overflow-hidden"
+            className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-2xl shadow-red-500/40 ring-4 ring-yellow-300/40 relative overflow-hidden"
           >
             {/* Animated pulse border */}
             <motion.div
@@ -96,7 +101,7 @@ export function ActiveShiftBanner() {
                       transition={{ duration: 1, repeat: Infinity }}
                       className="w-2.5 h-2.5 rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50"
                     />
-                    TURNO EM ANDAMENTO
+                    TURNO EM ABERTO — FECHAMENTO PENDENTE
                   </div>
                   <div className="flex items-baseline gap-2 md:gap-4 mt-1 flex-wrap">
                     <span className="text-3xl md:text-5xl font-black font-mono tabular-nums tracking-wider drop-shadow-lg">
@@ -116,7 +121,7 @@ export function ActiveShiftBanner() {
                   <div className="hidden sm:flex items-center gap-2 mt-1 text-[11px] md:text-sm opacity-90 flex-wrap">
                     <Clock size={12} />
                     <span>
-                      Entrada: <span className="font-mono font-black">{horaInicioBR}</span>
+                      Abertura: <span className="font-mono font-black">{dataInicioBR} às {horaInicioBR}</span>
                     </span>
                     <span>•</span>
                     <span>
@@ -131,7 +136,7 @@ export function ActiveShiftBanner() {
                 <button
                   type="button"
                   onClick={() => setEndModalOpen(true)}
-                  className="px-4 py-3 md:px-6 md:py-3.5 bg-white hover:bg-white/95 active:scale-95 text-emerald-700 font-black rounded-xl text-sm md:text-base uppercase tracking-wider flex items-center gap-2 transition-all shadow-xl cursor-pointer"
+                  className="px-4 py-3 md:px-6 md:py-3.5 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-xl text-sm md:text-base uppercase tracking-wider flex items-center gap-2 transition-all shadow-xl cursor-pointer"
                 >
                   <Square size={14} fill="currentColor" />
                   Encerrar Turno
@@ -158,7 +163,7 @@ export function ActiveShiftBanner() {
           animate={{ y: 0, opacity: 1 }}
           type="button"
           onClick={() => setMinimized(false)}
-          className="fixed top-3 right-3 z-30 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-black uppercase tracking-wider cursor-pointer ring-2 ring-yellow-300/60"
+          className="fixed top-3 right-3 z-30 bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-black uppercase tracking-wider cursor-pointer ring-2 ring-yellow-300/60"
           title="Reabrir banner do turno"
         >
           <motion.span

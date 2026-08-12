@@ -79,6 +79,53 @@ class CodelmaqSyncEngine {
     return this.verifyReferencesExist('ativos', machineIds);
   }
 
+  // Uploads local base64 photos (data URIs) to the fotos-registros bucket and
+  // returns the storage paths. Values that already look like a storage path or
+  // http URL are returned untouched (idempotent re-sync).
+  public async uploadPhotos(photos: string[] | undefined | null, folder: string): Promise<string[]> {
+    if (!Array.isArray(photos) || photos.length === 0) return [];
+    const paths: string[] = [];
+    for (const photo of photos) {
+      if (!photo) continue;
+      if (/^https?:\/\//i.test(photo)) { paths.push(photo); continue; }
+      const isDataUri = photo.startsWith('data:');
+      if (/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(photo) && !isDataUri) {
+        paths.push(photo);
+        continue;
+      }
+      try {
+        const bytes = isDataUri ? this.dataUriToBlob(photo) : this.b64toBlob(photo);
+        const extension = (photo.match(/^data:image\/([a-z]+)/i)?.[1] || 'jpeg').replace('jpeg', 'jpg');
+        const fileName = `${genId()}.${extension === 'jpg' ? 'jpg' : extension}`;
+        const filePath = `${folder}/${fileName}`;
+        const { data, error } = await supabase.storage
+          .from('fotos-registros')
+          .upload(filePath, bytes, { upsert: true, contentType: `image/${extension}` });
+        if (error) {
+          console.warn(`[syncEngine] upload de foto falhou (${filePath}):`, error.message);
+          continue;
+        }
+        paths.push(data?.path || filePath);
+      } catch (e) {
+        console.warn(`[syncEngine] erro ao preparar foto p/ upload:`, e);
+      }
+    }
+    return paths;
+  }
+
+  private dataUriToBlob(dataUri: string): Blob {
+    const [header, b64] = dataUri.split(',');
+    const mime = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+    return this.b64toBlob(b64, mime);
+  }
+
+  private b64toBlob(b64: string, mime = 'image/jpeg'): Blob {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+
   // Check the queue count of local unsynced records
   public async countPendingRecords(): Promise<number> {
     try {
@@ -206,6 +253,12 @@ class CodelmaqSyncEngine {
             workingId = newId;
             // Update local ID to prevent future sync failures with same wrong ID
             await localDb.checklists.update(localChk.id, { id: newId });
+          }
+
+          // Upload local photos to storage and replace base64 with paths
+          if (Array.isArray(localChk.defectPhotos) && localChk.defectPhotos.length > 0) {
+            const uploaded = await this.uploadPhotos(localChk.defectPhotos, `checklists/${workingId}`);
+            if (uploaded.length > 0) finalPayload.fotos = uploaded;
           }
 
           const { error } = await supabase
@@ -350,6 +403,12 @@ class CodelmaqSyncEngine {
             finalPayload.id = newId;
             workingId = newId;
             await localDb.registrosDiarios.update(localReg.id, { id: newId });
+          }
+
+          // Upload local photos to storage and replace base64 with paths
+          if (Array.isArray(localReg.photos) && localReg.photos.length > 0) {
+            const uploaded = await this.uploadPhotos(localReg.photos, `registros/${workingId}`);
+            if (uploaded.length > 0) finalPayload.fotos = uploaded;
           }
 
           const { error } = await supabase

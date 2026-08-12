@@ -72,7 +72,8 @@ export const mapLogToDB = (l: any) => ({
   fonte_combustivel: l.fuelSource || l.fonte_combustivel,
   observacoes: l.observations || l.observacoes,
   aberto_em: l.openedAt || l.aberto_em || l.horaInicio,
-  fechado_em: l.closedAt || l.fechado_em || l.horaFim || l.fechadoEm
+  fechado_em: l.closedAt || l.fechado_em || l.horaFim || l.fechadoEm,
+  fotos: Array.isArray(l.photos) && l.photos.length > 0 ? l.photos : null
 });
 
 export const mapDBToLog = (db: any) => ({
@@ -91,7 +92,8 @@ export const mapDBToLog = (db: any) => ({
   fuelSource: db.fonte_combustivel,
   observations: db.observacoes,
   openedAt: db.aberto_em,
-  closedAt: db.fechado_em
+  closedAt: db.fechado_em,
+  photos: Array.isArray(db.fotos) ? db.fotos : []
 });
 
 export const mapRefillToDB = (r: any) => ({
@@ -232,7 +234,8 @@ export const mapChecklistToDB = (chk: any) => ({
   data: chk.data,
   status: chk.status,
   respostas: chk.answers || null,
-  observacoes: chk.observacoes || null
+  observacoes: chk.observacoes || null,
+  fotos: Array.isArray(chk.defectPhotos) && chk.defectPhotos.length > 0 ? chk.defectPhotos : null
 });
 
 export const mapDBToChecklist = (db: any) => ({
@@ -243,6 +246,7 @@ export const mapDBToChecklist = (db: any) => ({
   status: db.status,
   answers: db.respostas,
   observacoes: db.observacoes,
+  defectPhotos: Array.isArray(db.fotos) ? db.fotos : [],
   synced: 1
 });
 

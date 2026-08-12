@@ -105,7 +105,34 @@ export const useFleetStore = create<FleetState>()(
             }
 
             if (item.tipo === 'parte_diaria') {
-              const { error } = await supabase.from('registros_diarios').insert([mapLogToDB(syncPayload)]);
+              // Upload local photos to storage before inserting
+              const dados = { ...syncPayload };
+              if (Array.isArray(dados.photos) && dados.photos.length > 0) {
+                const paths: string[] = [];
+                for (const photo of dados.photos) {
+                  if (!photo) continue;
+                  if (/^https?:\/\//i.test(photo) || /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/.test(photo)) {
+                    paths.push(photo);
+                    continue;
+                  }
+                  try {
+                    const mime = (photo.match(/^data:image\/([a-z]+)/i)?.[1] || 'jpeg').replace('jpeg', 'jpg');
+                    const b64 = photo.includes(',') ? photo.split(',')[1] : photo;
+                    const bin = atob(b64);
+                    const bytes = new Uint8Array(bin.length);
+                    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                    const filePath = `registros/${dados.id || genId()}/${genId()}.${mime === 'jpg' ? 'jpg' : mime}`;
+                    const { data, error } = await supabase.storage
+                      .from('fotos-registros')
+                      .upload(filePath, new Blob([bytes], { type: `image/${mime}` }), { upsert: true });
+                    if (!error && data?.path) paths.push(data.path);
+                  } catch (e) {
+                    console.warn('[store] erro ao subir foto:', e);
+                  }
+                }
+                dados.photos = paths;
+              }
+              const { error } = await supabase.from('registros_diarios').insert([mapLogToDB(dados)]);
               if (error) {
                 // Handle FK violation
                 if (error.code === '23503') {

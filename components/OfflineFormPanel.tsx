@@ -18,6 +18,7 @@ import {
   Play,
   Square,
   Clock,
+  History,
 } from 'lucide-react';
 import { localDb } from '@/lib/localDb';
 import { syncEngine, SyncStatusReport } from '@/lib/syncEngine';
@@ -33,6 +34,18 @@ import {
   trustedDayString as trustedDayStringImport,
   trustedNowIso as trustedNowIsoImport,
 } from '@/lib/trustedClock';
+
+// Rótulos legíveis dos itens de vistoria (compartilhados entre validação e render).
+const CHECKLIST_LABELS: Record<string, string> = {
+  motor: 'Sistema do Motor',
+  hidraulica: 'Mecanismos Hidráulicos',
+  eletrica: 'Parte Elétrica',
+  freios: 'Freios de Emergência',
+  pneus_lagartas: 'Pneus / Lagartas',
+  luzes: 'Faróis e Iluminação',
+  nivel_oleo: 'Nível de Óleo / Arrefecimento',
+  vazamentos: 'Filtros e Vazamento'
+};
 
 interface OfflineFormPanelProps {
   machines?: Array<{ id: string; name: string; type: string; measureUnit?: string }>;
@@ -83,16 +96,16 @@ export function OfflineFormPanel({
   const fuelAddedRef = useRef<HTMLInputElement>(null);
   const commentsRef = useRef<HTMLTextAreaElement>(null);
 
-  // Verification item answers
-  const [checklistAnswers, setChecklistAnswers] = useState<Record<string, 'bom' | 'reparar' | 'critico'>>({
-    motor: 'bom',
-    hidraulica: 'bom',
-    eletrica: 'bom',
-    freios: 'bom',
-    pneus_lagartas: 'bom',
-    luzes: 'bom',
-    nivel_oleo: 'bom',
-    vazamentos: 'bom'
+  // Verification item answers — null = ainda não respondido (obrigatório na abertura de turno)
+  const [checklistAnswers, setChecklistAnswers] = useState<Record<string, 'bom' | 'reparar' | 'critico' | null>>({
+    motor: null,
+    hidraulica: null,
+    eletrica: null,
+    freios: null,
+    pneus_lagartas: null,
+    luzes: null,
+    nivel_oleo: null,
+    vazamentos: null
   });
 
   // Setup current values or load previous offline entries on mounting
@@ -108,6 +121,31 @@ export function OfflineFormPanel({
     });
     return unsubscribe;
   }, []);
+
+  // Rastreia se havia turno ativo na renderização anterior (para detectar encerramento).
+  const lastActiveShiftRef = useRef(false);
+
+  // Quando um turno é encerrado (aqui ou no banner global) e volta a abertura
+  // disponível, preparamos o formulário para uma máquina adicional: limpa a
+  // máquina atual e a vistoria, mantendo o operador pronto para iniciar outra.
+  useEffect(() => {
+    if (!activeShift && lastActiveShiftRef.current) {
+      setMachineId('');
+      setChecklistAnswers({
+        motor: null,
+        hidraulica: null,
+        eletrica: null,
+        freios: null,
+        pneus_lagartas: null,
+        luzes: null,
+        nivel_oleo: null,
+        vazamentos: null,
+      });
+      setPhotos([]);
+      if (horimetroInicialRef.current) horimetroInicialRef.current.value = '';
+    }
+    lastActiveShiftRef.current = !!activeShift;
+  }, [activeShift]);
 
   const loadRecentLogs = async () => {
     try {
@@ -300,6 +338,9 @@ export function OfflineFormPanel({
           : hasRepair
           ? 'atencao'
           : 'aprovado';
+        const sanitizedAnswers = Object.fromEntries(
+          Object.entries(checklistAnswers).map(([k, v]) => [k, v ?? 'bom'])
+        );
 
         await localDb.checklists.add({
           id: genId(),
@@ -316,7 +357,7 @@ export function OfflineFormPanel({
           }),
           horimetro: horimetroFinal,
           status: checklistStatus,
-          answers: { ...checklistAnswers },
+          answers: sanitizedAnswers,
           synced: 0,
           observacoes: observations,
           defectPhotos: [...photos],
@@ -389,6 +430,9 @@ export function OfflineFormPanel({
           : hasRepair
           ? 'atencao'
           : 'aprovado';
+        const sanitizedAnswers = Object.fromEntries(
+          Object.entries(checklistAnswers).map(([k, v]) => [k, v ?? 'bom'])
+        );
 
         const recordId = genId();
 
@@ -401,7 +445,7 @@ export function OfflineFormPanel({
           horaSaida: '17:00',
           horimetro: horimetroFinal,
           status,
-          answers: { ...checklistAnswers },
+          answers: sanitizedAnswers,
           synced: 0,
           observacoes: observations,
           defectPhotos: [...photos],
@@ -486,6 +530,21 @@ export function OfflineFormPanel({
         return;
       }
 
+      // Vistoria sensível é PRÉ-REQUISITO para abrir o turno.
+      const unansweredItems = Object.keys(checklistAnswers).filter((k) => !checklistAnswers[k]);
+      if (unansweredItems.length > 0) {
+        playError();
+        feedback.showWithSound({
+          kind: 'error',
+          title: 'Complete os itens de vistoria',
+          subtitle: `${unansweredItems.length} item(ns) ainda sem status.`,
+          errorMessage: `Selecione Bom / Reparo / Avaria em: ${unansweredItems
+            .map((k) => CHECKLIST_LABELS[k] || k)
+            .join(', ')} para abrir o turno.`,
+        });
+        return;
+      }
+
       const recordId = genId();
       const rascunho = {
         id: recordId,
@@ -509,6 +568,34 @@ export function OfflineFormPanel({
       };
 
       await localDb.registrosDiarios.add(rascunho);
+
+      // Grava a vistoria sensível feita na abbertura do turno.
+      const hasCritical = Object.values(checklistAnswers).some((val) => val === 'critico');
+      const hasRepair = Object.values(checklistAnswers).some((val) => val === 'reparar');
+      const checklistStatus: 'aprovado' | 'atencao' | 'critico' = hasCritical
+        ? 'critico'
+        : hasRepair
+        ? 'atencao'
+        : 'aprovado';
+      const sanitizedAnswers = Object.fromEntries(
+        Object.entries(checklistAnswers).map(([k, v]) => [k, v ?? 'bom'])
+      );
+      await localDb.checklists.add({
+        id: genId(),
+        machineId,
+        supervisorId: operatorId,
+        data: today,
+        horaEntrada: new Date(nowIso).toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        horimetro: horimetroInicial,
+        status: checklistStatus,
+        answers: sanitizedAnswers,
+        synced: 0,
+        observacoes: observations,
+        defectPhotos: [...photos],
+      });
       await syncEngine.countPendingRecords();
 
       const machine = (machines || []).find((m) => m.id === machineId);
@@ -563,14 +650,14 @@ export function OfflineFormPanel({
     setMachineId('');
     setSiteId('');
     setChecklistAnswers({
-      motor: 'bom',
-      hidraulica: 'bom',
-      eletrica: 'bom',
-      freios: 'bom',
-      pneus_lagartas: 'bom',
-      luzes: 'bom',
-      nivel_oleo: 'bom',
-      vazamentos: 'bom',
+      motor: null,
+      hidraulica: null,
+      eletrica: null,
+      freios: null,
+      pneus_lagartas: null,
+      luzes: null,
+      nivel_oleo: null,
+      vazamentos: null,
     });
     setPhotos([]);
     if (horimetroInicialRef.current) horimetroInicialRef.current.value = '';
@@ -619,7 +706,7 @@ export function OfflineFormPanel({
     lookupLastShift(machineIdFromCode);
   };
 
-  const lookupLastShift = async (machineId: string) => {
+  const lookupLastShift = async (machineId: string, fillInput = false) => {
     try {
       const records = await localDb.registrosDiarios
         .where('machineId').equals(machineId)
@@ -634,9 +721,15 @@ export function OfflineFormPanel({
         const finalValue = closed[0].horimetroFinal as number;
         setPreviousHorimetro(finalValue);
         setPreviousEndDate(closed[0].data || null);
+        if (fillInput && horimetroInicialRef.current) {
+          horimetroInicialRef.current.value = String(finalValue);
+        }
       } else {
         setPreviousHorimetro(null);
         setPreviousEndDate(null);
+        if (fillInput && horimetroInicialRef.current) {
+          horimetroInicialRef.current.value = '';
+        }
       }
     } catch (e) {
       console.warn('lookupLastShift failed:', e);
@@ -893,7 +986,10 @@ export function OfflineFormPanel({
               <select
                 required
                 value={machineId}
-                onChange={(e) => setMachineId(e.target.value)}
+                onChange={(e) => {
+                  setMachineId(e.target.value);
+                  if (e.target.value) lookupLastShift(e.target.value, true);
+                }}
                 className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 text-lg md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-medium"
               >
                 <option value="">Selecione a máquina...</option>
@@ -941,11 +1037,21 @@ export function OfflineFormPanel({
                     const original = e.currentTarget.value;
                     const cleaned = original.replace(/[^\d.,-]/g, '');
                     if (cleaned !== original) e.currentTarget.value = cleaned;
+                    setPreviousHorimetro(null);
+                    setPreviousEndDate(null);
                   }}
                   placeholder="Ex: 1450"
                   className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
                 />
               </div>
+              {previousHorimetro !== null && (
+                <span className="text-[11px] md:text-[10px] text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-1 flex items-center gap-1">
+                  <History size={12} className="flex-shrink-0" />
+                  Pré-preenchido com o final do último turno
+                  {previousEndDate ? ` (${previousEndDate})` : ''}:{' '}
+                  <b className="font-mono">{previousHorimetro}</b>. Confira no painel da máquina.
+                </span>
+              )}
             </div>
 
             <div className="flex flex-col space-y-2">
@@ -1017,22 +1123,11 @@ export function OfflineFormPanel({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {Object.keys(checklistAnswers).map((itemKey) => {
-                const labelMap: Record<string, string> = {
-                  motor: 'Sistema do Motor',
-                  hidraulica: 'Mecanismos Hidráulicos',
-                  eletrica: 'Parte Elétrica',
-                  freios: 'Freios de Emergência',
-                  pneus_lagartas: 'Pneus / Lagartas',
-                  luzes: 'Faróis e Iluminação',
-                  nivel_oleo: 'Nível de Óleo / Arrefecimento',
-                  vazamentos: 'Filtros e Vazamento'
-                };
-
                 const currentVal = checklistAnswers[itemKey];
 
                 return (
                   <div key={itemKey} className="p-4 md:p-3 bg-white dark:bg-black/20 rounded-xl border-2 border-gray-300 dark:border-white/5 flex flex-col justify-between space-y-2.5">
-                    <span className="text-base md:text-xs font-bold text-gray-900 dark:text-white">{labelMap[itemKey] || itemKey}</span>
+                    <span className="text-base md:text-xs font-bold text-gray-900 dark:text-white">{CHECKLIST_LABELS[itemKey] || itemKey}</span>
                     <div className="grid grid-cols-3 gap-1.5">
                       <button
                         type="button"
