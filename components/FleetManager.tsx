@@ -143,7 +143,9 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
       userFriendlyMessage = "Não é possível excluir este registro pois existem outros dados vinculados a ele (ex: manutenções, abastecimentos ou logs).";
     } else if (error.code === '23505') {
       userFriendlyMessage = "Este registro já existe no banco de dados (chave duplicada).";
-    } else if (error.code === '42P01' || error.message?.includes("relation") || error.message?.includes("not found")) {
+    } else if (error.code === '23514') {
+      userFriendlyMessage = "Valor inválido para o campo (ex.: status ou pontos fora da regra do banco). Verifique os dados e tente novamente.";
+    } else if (error.code === '42P01' || error.message?.includes('relation "') || error.message?.includes("does not exist")) {
       userFriendlyMessage = "Uma tabela necessária não foi encontrada no banco de dados. Verifique se as migrações foram aplicadas.";
     } else if (error.code === '42703' || error.message?.includes("column")) {
       userFriendlyMessage = "Uma coluna necessária não foi encontrada. O esquema do banco de dados pode estar desatualizado.";
