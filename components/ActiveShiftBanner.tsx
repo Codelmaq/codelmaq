@@ -68,24 +68,24 @@ export function ActiveShiftBanner() {
             exit={{ y: -120, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 240, damping: 24 }}
             data-testid="active-shift-banner"
-            className="sticky top-0 z-30 md:flex md:justify-center md:px-3 md:pt-2"
+            className="sticky top-0 z-30 bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30"
           >
-            <div className="w-full md:w-auto bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white shadow-lg shadow-red-500/30 ring-2 ring-yellow-300/30 md:rounded-full px-3 py-1.5 md:px-4 md:py-2 flex flex-col md:flex-row md:items-center justify-between gap-1.5 md:gap-3">
-              {/* Status + timer + machine + meta — linha superior (mobile) / compacto (desktop) */}
-              <div className="flex items-center gap-2 min-w-0 flex-1 md:flex-none">
+            <div className="max-w-4xl mx-auto px-3 py-1.5 md:px-4 md:py-2 flex flex-col gap-1.5 md:gap-2">
+              {/* Status + timer + machine + meta — linha superior */}
+              <div className="flex items-center gap-2 min-w-0">
                 <motion.span
                   animate={{ opacity: [1, 0.35, 1] }}
                   transition={{ duration: 1, repeat: Infinity }}
                   className="w-2 h-2 rounded-full bg-yellow-300 shadow-lg shadow-yellow-300/50 flex-shrink-0"
                 />
-                <span className="text-[10px] md:text-xs uppercase tracking-widest font-black whitespace-nowrap">
+                <span className="text-[10px] uppercase tracking-widest font-black whitespace-nowrap">
                   Turno em aberto
                 </span>
-                <span className="hidden sm:inline text-xs opacity-70">•</span>
+                <span className="text-xs opacity-70">•</span>
                 <span className="text-sm md:text-lg font-black font-mono tabular-nums tracking-wider">
                   {elapsed}
                 </span>
-                <span className="hidden sm:inline text-xs opacity-70">•</span>
+                <span className="text-xs opacity-70">•</span>
                 <span className="text-xs md:text-sm font-bold flex items-center gap-1 min-w-0">
                   <Truck size={13} className="md:size-3.5 flex-shrink-0" />
                   <span className="truncate">{activeShift?.machineId || '— nenhuma máquina ativa —'}</span>
@@ -98,8 +98,8 @@ export function ActiveShiftBanner() {
                 </span>
               </div>
 
-              {/* Actions — linha inferior no mobile, ao lado no desktop */}
-              <div className="flex items-center gap-1.5 w-full md:w-auto flex-shrink-0">
+              {/* Actions — linha inferior */}
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -109,7 +109,7 @@ export function ActiveShiftBanner() {
                       endTurno();
                     }
                   }}
-                  className="flex-1 md:flex-none justify-center px-3 py-1.5 md:px-4 md:py-2 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-lg text-[11px] md:text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                  className="flex-1 md:flex-none justify-center px-3 py-1.5 md:px-4 md:py-2 bg-white hover:bg-white/95 active:scale-95 text-red-700 font-black rounded-lg text-[11px] uppercase tracking-wider flex items-center gap-1.5 transition-all shadow cursor-pointer"
                 >
                   <Square size={12} fill="currentColor" />
                   Encerrar Turno
