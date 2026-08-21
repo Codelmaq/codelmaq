@@ -24,6 +24,7 @@ export function PhotoCaptureModal({ open, title = 'Registrar Foto', description,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -231,7 +232,7 @@ export function PhotoCaptureModal({ open, title = 'Registrar Foto', description,
                     </button>
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => galleryInputRef.current?.click()}
                       disabled={busy}
                       className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
@@ -241,6 +242,14 @@ export function PhotoCaptureModal({ open, title = 'Registrar Foto', description,
                   </div>
                   <input
                     ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleGalleryFile}
+                  />
+                  <input
+                    ref={galleryInputRef}
                     type="file"
                     accept="image/*"
                     className="hidden"

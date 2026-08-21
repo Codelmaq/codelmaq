@@ -8,3 +8,5 @@ coverage/
 opencode.json
 
 .vercel
+dist/
+tsconfig.tsbuildinfo

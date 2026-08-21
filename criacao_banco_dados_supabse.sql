@@ -218,3 +218,51 @@ CREATE POLICY "Permitir acesso público a modelos_manutencao" ON public.modelos_
 CREATE POLICY "Permitir acesso público a planos_manutencao" ON public.planos_manutencao FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir acesso público a manutencoes" ON public.manutencoes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir acesso público a relatorios_gerenciais" ON public.relatorios_gerenciais FOR ALL USING (true) WITH CHECK (true);
+
+-- ==========================================
+-- 12. VIEW: RELATÓRIO DE REGISTROS
+-- ==========================================
+CREATE OR REPLACE VIEW public.vw_relatorio_registros AS
+SELECT
+  rd.id,
+  rd.data,
+  rd.ativo_id,
+  a.tipo AS ativo_tipo,
+  a.marca AS ativo_marca,
+  a.modelo AS ativo_modelo,
+  rd.operador_id,
+  f.nome AS operador_nome,
+  rd.frente_servico_id,
+  fs.nome AS frente_servico_nome,
+  rd.horimetro_inicial,
+  rd.horimetro_final,
+  CASE
+    WHEN rd.horimetro_final IS NOT NULL AND rd.horimetro_inicial IS NOT NULL
+    THEN rd.horimetro_final - rd.horimetro_inicial
+    ELSE 0
+  END AS horas_maquina,
+  rd.combustivel_adicionado,
+  rd.fonte_combustivel,
+  rd.observacoes,
+  rd.status,
+  rd.aberto_em,
+  rd.fechado_em,
+  CASE
+    WHEN rd.fechado_em IS NOT NULL AND rd.aberto_em IS NOT NULL
+    THEN EXTRACT(EPOCH FROM (rd.fechado_em - rd.aberto_em)) / 3600
+    ELSE 0
+  END AS jornada_colaborador,
+  rd.criado_em,
+  rd.fotos,
+  rd.foto_horimetro_inicial,
+  rd.foto_horimetro_final,
+  (
+    SELECT COALESCE(jsonb_agg(c.respostas), '[]'::jsonb)
+    FROM public.checklists c
+    WHERE c.ativo_id = rd.ativo_id
+      AND c.data::date = rd.data
+  ) AS checklist_respostas
+FROM public.registros_diarios rd
+LEFT JOIN public.funcionarios f ON rd.operador_id = f.id
+LEFT JOIN public.frentes_servico fs ON rd.frente_servico_id = fs.id
+LEFT JOIN public.ativos a ON rd.ativo_id = a.id;

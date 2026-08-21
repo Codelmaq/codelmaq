@@ -2626,7 +2626,6 @@ export const ReportsView = ({ logs, machines, employees }: any) => {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

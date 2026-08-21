@@ -119,6 +119,30 @@ export function OfflineFormPanel({
     vazamentos: null
   });
 
+  // Rehydrate form fields from the persisted shift store when the component
+  // mounts (e.g. after switching tabs). Without this, machineId / siteId /
+  // horimetroInicial / checklist / foto would be blank even though a shift is active.
+  useEffect(() => {
+    if (activeShift) {
+      setMachineId(activeShift.machineId);
+      if (horimetroInicialRef.current) {
+        horimetroInicialRef.current.value = String(activeShift.horimetroInicial);
+      }
+      if (activeShift.siteId) {
+        setSiteId(activeShift.siteId);
+      }
+      if (activeShift.checklistAnswers) {
+        setChecklistAnswers((prev) => ({ ...prev, ...activeShift.checklistAnswers }));
+      }
+      if (activeShift.fotoHorimetroInicial) {
+        setFotoHorimetroInicial(activeShift.fotoHorimetroInicial);
+      }
+    }
+    if (turno?.siteId && !activeShift?.siteId) {
+      setSiteId(turno.siteId);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Setup current values or load previous offline entries on mounting
   useEffect(() => {
     loadRecentLogs();
@@ -654,8 +678,13 @@ export function OfflineFormPanel({
         id: recordId,
         machineId,
         machineName: machine?.name || '',
+        siteId: rascunho.siteId,
         startedAt: nowIso,
         horimetroInicial,
+        checklistAnswers: Object.fromEntries(
+          Object.entries(checklistAnswers).map(([k, v]) => [k, v ?? 'bom'])
+        ) as Record<string, 'bom' | 'reparar' | 'critico'>,
+        fotoHorimetroInicial,
       };
 
       // Primeira máquina do dia → abre a jornada. Máquina seguinte,
@@ -857,8 +886,13 @@ export function OfflineFormPanel({
         id: newDailyLog.id,
         machineId: newDailyLog.machineId,
         machineName: newDailyLog.machineName,
+        siteId: newDailyLog.siteId,
         startedAt: nowIso,
         horimetroInicial: newDailyLog.horimetroInicial,
+        checklistAnswers: Object.fromEntries(
+          Object.entries(checklistAnswers).map(([k, v]) => [k, v ?? 'bom'])
+        ) as Record<string, 'bom' | 'reparar' | 'critico'>,
+        fotoHorimetroInicial,
       };
 
       if (turno) {
@@ -1165,15 +1199,18 @@ export function OfflineFormPanel({
           {/* Linha 1: Ativo + Obra */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col space-y-2">
-              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Ativo da Frota</label>
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">
+                Ativo da Frota {activeShift && <span className="text-emerald-600 dark:text-emerald-400 normal-case">(travado)</span>}
+              </label>
               <select
                 required
                 value={machineId}
+                disabled={!!activeShift}
                 onChange={(e) => {
                   setMachineId(e.target.value);
                   if (e.target.value) lookupLastShift(e.target.value, true);
                 }}
-                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 text-lg md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-medium"
+                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 text-lg md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-medium disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-white/5"
               >
                 <option value="">Selecione a máquina...</option>
                 {machines.map((m) => (
@@ -1185,11 +1222,14 @@ export function OfflineFormPanel({
             </div>
 
             <div className="flex flex-col space-y-2">
-              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Obra de Operação</label>
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">
+                Obra de Operação {activeShift && <span className="text-emerald-600 dark:text-emerald-400 normal-case">(travado)</span>}
+              </label>
               <select
                 value={siteId}
+                disabled={!!activeShift}
                 onChange={(e) => setSiteId(e.target.value)}
-                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 text-lg md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-medium"
+                className="bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 text-lg md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-medium disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-white/5"
               >
                 {sites.map((st: any, idx: number) => (
                   <option key={st.id || idx} value={st.id || st.nome || st.name || st}>
@@ -1206,13 +1246,16 @@ export function OfflineFormPanel({
           {/* Linha 2: Hor.Inicial + Hor.Final + Abastecimento + Data — empilhados no mobile */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col space-y-2">
-              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">Horímetro / KM Inicial</label>
+              <label className="text-base md:text-[10px] text-gray-800 dark:text-gray-300 uppercase font-bold tracking-wider">
+                Horímetro / KM Inicial {activeShift && <span className="text-emerald-600 dark:text-emerald-400 normal-case">(travado)</span>}
+              </label>
               <div className="relative">
                 <Gauge className="absolute left-4 top-1/2 -translate-y-1/2 md:top-2.5 md:translate-y-0 text-gray-600 dark:text-gray-300" size={20} />
                 <input
                   type="text"
                   inputMode="decimal"
                   ref={horimetroInicialRef}
+                  readOnly={!!activeShift}
                   onInput={(e) => {
                     // Strip anything that isn't a digit/comma/period so pt-BR "30,5"
                     // works. Input is uncontrolled, so direct DOM write is safe.
@@ -1223,7 +1266,7 @@ export function OfflineFormPanel({
                     setPreviousEndDate(null);
                   }}
                   placeholder="Ex: 1450"
-                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold"
+                  className="w-full bg-white dark:bg-black/50 border-2 border-gray-300 dark:border-white/10 rounded-xl p-4 md:p-2.5 pl-12 md:pl-9 text-xl md:text-xs text-gray-900 dark:text-white focus:border-[#eab308] outline-none font-mono font-bold read-only:opacity-60 read-only:cursor-not-allowed read-only:bg-gray-100 dark:read-only:bg-white/5"
                 />
               </div>
               {fotoHorimetroInicial ? (
@@ -1237,13 +1280,15 @@ export function OfflineFormPanel({
                   <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
                     <CheckCircle size={12} /> Foto registrada
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setFotoHorimetroInicial(null)}
-                    className="text-[10px] text-red-600 dark:text-red-400 hover:underline cursor-pointer"
-                  >
-                    remover
-                  </button>
+                  {!activeShift && (
+                    <button
+                      type="button"
+                      onClick={() => setFotoHorimetroInicial(null)}
+                      className="text-[10px] text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                    >
+                      remover
+                    </button>
+                  )}
                 </div>
               ) : (
                 <button
@@ -1379,27 +1424,30 @@ export function OfflineFormPanel({
                 const currentVal = checklistAnswers[itemKey];
 
                 return (
-                  <div key={itemKey} className="p-4 md:p-3 bg-white dark:bg-black/20 rounded-xl border-2 border-gray-300 dark:border-white/5 flex flex-col justify-between space-y-2.5">
+                  <div key={itemKey} className={`p-4 md:p-3 bg-white dark:bg-black/20 rounded-xl border-2 border-gray-300 dark:border-white/5 flex flex-col justify-between space-y-2.5 ${activeShift ? 'opacity-60' : ''}`}>
                     <span className="text-base md:text-xs font-bold text-gray-900 dark:text-white">{CHECKLIST_LABELS[itemKey] || itemKey}</span>
                     <div className="grid grid-cols-3 gap-1.5">
                       <button
                         type="button"
+                        disabled={!!activeShift}
                         onClick={() => setChecklistAnswers(prev => ({ ...prev, [itemKey]: 'bom' }))}
-                        className={`py-2.5 md:py-1.5 rounded-lg text-sm md:text-[10px] font-bold text-center cursor-pointer transition-colors ${currentVal === 'bom' ? 'bg-emerald-200 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-2 border-emerald-500 dark:border-emerald-500/40' : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-transparent'}`}
+                        className={`py-2.5 md:py-1.5 rounded-lg text-sm md:text-[10px] font-bold text-center transition-colors ${currentVal === 'bom' ? 'bg-emerald-200 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-2 border-emerald-500 dark:border-emerald-500/40' : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-transparent'} ${activeShift ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         Bom
                       </button>
                       <button
                         type="button"
+                        disabled={!!activeShift}
                         onClick={() => setChecklistAnswers(prev => ({ ...prev, [itemKey]: 'reparar' }))}
-                        className={`py-2.5 md:py-1.5 rounded-lg text-sm md:text-[10px] font-bold text-center cursor-pointer transition-colors ${currentVal === 'reparar' ? 'bg-amber-200 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-2 border-amber-500 dark:border-amber-500/40' : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-transparent'}`}
+                        className={`py-2.5 md:py-1.5 rounded-lg text-sm md:text-[10px] font-bold text-center transition-colors ${currentVal === 'reparar' ? 'bg-amber-200 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border-2 border-amber-500 dark:border-amber-500/40' : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-transparent'} ${activeShift ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         Reparo
                       </button>
                       <button
                         type="button"
+                        disabled={!!activeShift}
                         onClick={() => setChecklistAnswers(prev => ({ ...prev, [itemKey]: 'critico' }))}
-                        className={`py-2.5 md:py-1.5 rounded-lg text-sm md:text-[10px] font-bold text-center cursor-pointer transition-colors ${currentVal === 'critico' ? 'bg-red-200 dark:bg-red-500/20 text-red-800 dark:text-red-300 border-2 border-red-500 dark:border-red-500/40' : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-transparent'}`}
+                        className={`py-2.5 md:py-1.5 rounded-lg text-sm md:text-[10px] font-bold text-center transition-colors ${currentVal === 'critico' ? 'bg-red-200 dark:bg-red-500/20 text-red-800 dark:text-red-300 border-2 border-red-500 dark:border-red-500/40' : 'bg-gray-100 dark:bg-black/30 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-transparent'} ${activeShift ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         Avaria
                       </button>

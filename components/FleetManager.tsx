@@ -22,6 +22,8 @@ import { ProfileView } from './ProfileView';
 import MobileApkHub from './MobileApkHub';
 import { QrCodeManager } from './QrCodeManager';
 import { ActiveShiftBanner } from './ActiveShiftBanner';
+import { ColaboradoresView } from './ColaboradoresView';
+import { EmployeeHistoryView } from './EmployeeHistoryView';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { 
   mapDBToMachine, mapMachineToDB, 
@@ -41,6 +43,7 @@ import { normalizeRole } from '@/types/auth';
 import { SyncIndicator } from './SyncIndicator';
 import { OfflineFormPanel } from './OfflineFormPanel';
 import { ThemeToggle } from './ThemeToggle';
+import { RelatorioRegistrosView } from './RelatorioRegistrosView';
 import { genId } from '@/lib/utils';
 
 export default function FleetManager({ initialView = 'dashboard' }: { initialView?: string }) {
@@ -99,6 +102,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
     };
   }, [sincronizarComSupabase]);
   const [currentView, setCurrentView] = useState(initialView);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentView(initialView);
@@ -1314,6 +1318,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
       { id: 'machines', label: 'Frota e Caminhões', icon: Truck, path: '/frota' },
       { id: 'maintenance', label: 'Ordens de Serviço', icon: Wrench, path: '/ordens-servico' },
       { id: 'reports', label: 'Métricas em Campo', icon: BarChart3, path: '/relatorios' },
+      { id: 'records-report', label: 'Relatório de registros', icon: FileText, path: '/relatorio-registros' },
       { id: 'admin', label: 'Painel Administrativo', icon: ShieldCheck, path: '/configuracoes' },
       { id: 'qr-codes', label: 'QR Codes da Frota', icon: QrCode, path: '/qr-codes' },
     ];
@@ -1330,6 +1335,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
         item.id === 'dashboard' ||
         item.id === 'machines' ||
         item.id === 'reports' ||
+        item.id === 'records-report' ||
         item.id === 'admin' ||
         item.id === 'qr-codes' ||
         item.id === 'performance'
@@ -1341,6 +1347,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
     if (roleNormalized === 'mecanico') {
       return items.filter(item =>
         item.id === 'daily-logs' ||
+        item.id === 'records-report' ||
         item.id === 'performance' ||
         item.id === 'fuel-truck' ||
         item.id === 'workshop'
@@ -1351,6 +1358,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
     if (roleNormalized === 'motorista') {
       return items.filter(item =>
         item.id === 'daily-logs' ||
+        item.id === 'records-report' ||
         item.id === 'performance' ||
         item.id === 'fuel-truck'
       );
@@ -1359,6 +1367,7 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
     // Operador (e fallback): parte diária + meu desempenho.
     return items.filter(item =>
       item.id === 'daily-logs' ||
+      item.id === 'records-report' ||
       item.id === 'performance'
     );
   }, [isAdmin, isGestor, userProfile]);
@@ -1370,13 +1379,13 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
 
       let allowedViews: string[];
       if (isGestor) {
-        allowedViews = ['dashboard', 'machines', 'reports', 'admin', 'qr-codes', 'performance'];
+        allowedViews = ['dashboard', 'machines', 'reports', 'records-report', 'admin', 'qr-codes', 'performance'];
       } else if (roleNormalized === 'mecanico') {
-        allowedViews = ['daily-logs', 'performance', 'fuel-truck', 'workshop'];
+        allowedViews = ['daily-logs', 'records-report', 'performance', 'fuel-truck', 'workshop'];
       } else if (roleNormalized === 'motorista') {
-        allowedViews = ['daily-logs', 'performance', 'fuel-truck'];
+        allowedViews = ['daily-logs', 'records-report', 'performance', 'fuel-truck'];
       } else {
-        allowedViews = ['daily-logs', 'performance'];
+        allowedViews = ['daily-logs', 'records-report', 'performance'];
       }
 
       if (!allowedViews.includes(currentView)) {
@@ -1641,7 +1650,6 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
                 </div>
               </div>
 
-              {/* Unified Checklist Form (always available) */}
               <OfflineFormPanel
                 machines={machines}
                 sites={sites}
@@ -1652,20 +1660,6 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
                   email: userProfile.email || '',
                 } : null}
               />
-
-              {/* Admin-only: Online Logs Table + Exports + History */}
-              {isAdmin && (
-                <DailyLogView
-                  logs={dailyLogs}
-                  machines={machines}
-                  employees={employees}
-                  sites={sites}
-                  onAddLog={handleAddDailyLog}
-                  onEditLog={handleEditDailyLog}
-                  onDeleteLog={handleDeleteDailyLog}
-                  isAdminAuthenticated={isAdmin}
-                />
-              )}
             </div>
           )}
           {currentView === 'performance' && (
@@ -1715,6 +1709,15 @@ export default function FleetManager({ initialView = 'dashboard' }: { initialVie
           )}
           {currentView === 'reports' && isManager && (
             <ReportsView logs={dailyLogs} machines={machines} employees={employees} />
+          )}
+          {currentView === 'records-report' && (
+            <RelatorioRegistrosView
+              userId={userProfile?.id}
+              isAdmin={isAdmin}
+              isGestor={isGestor}
+              employees={employees}
+              machines={machines}
+            />
           )}
           {currentView === 'admin' && isManager && (
             <AdminView

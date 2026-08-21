@@ -27,6 +27,7 @@ export default function App() {
         <Route path="/frota" element={<FleetManager initialView="machines" />} />
         <Route path="/ordens-servico" element={<FleetManager initialView="maintenance" />} />
         <Route path="/relatorios" element={<FleetManager initialView="reports" />} />
+        <Route path="/relatorio-registros" element={<FleetManager initialView="records-report" />} />
         <Route path="/configuracoes" element={<FleetManager initialView="admin" />} />
         <Route path="/qr-codes" element={<FleetManager initialView="qr-codes" />} />
         <Route path="/perfil" element={<FleetManager initialView="profile" />} />

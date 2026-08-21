@@ -18,8 +18,11 @@ export interface ShiftMachine {
   id: string;             // uuid (matches the LocalRegistroDiario id / rascunho)
   machineId: string;      // ativo.id
   machineName?: string;
+  siteId?: string;        // frente de serviço / obra de operação
   horimetroInicial: number;
   startedAt: string;      // ISO de quando tal máquina foi ativada
+  checklistAnswers?: Record<string, 'bom' | 'reparar' | 'critico'>;
+  fotoHorimetroInicial?: string | null;
 }
 
 interface ShiftState {
